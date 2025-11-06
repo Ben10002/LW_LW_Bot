@@ -14,6 +14,9 @@ import pytesseract
 import os
 import re
 import threading
+import json
+from datetime import datetime
+import pytz
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -45,7 +48,7 @@ TRANSLATIONS = {
         'reset_interval': 'Reset-Intervall (Minuten)',
         'share_mode': 'Teilen in',
         'share_world': 'Weltchat',
-        'share_alliance': 'Allianz-Chat',
+        'share_alliance': 'A4O',
         'save_settings': 'Einstellungen speichern',
         'login_title': 'LKW-Bot',
         'username': 'Benutzername',
@@ -60,7 +63,8 @@ TRANSLATIONS = {
         'no_action': 'Keine Aktion',
         'settings_saved': 'Einstellungen gespeichert!',
         'confirm_reset': 'Statistiken wirklich zurücksetzen?',
-        'language': 'Sprache'
+        'language': 'Sprache',
+        'admin_dashboard': 'Admin'
     },
     'en': {
         'app_title': 'Truck Bot Control',
@@ -86,7 +90,7 @@ TRANSLATIONS = {
         'reset_interval': 'Reset interval (minutes)',
         'share_mode': 'Share in',
         'share_world': 'World Chat',
-        'share_alliance': 'Alliance Chat',
+        'share_alliance': 'A4O',
         'save_settings': 'Save Settings',
         'login_title': 'Truck Bot',
         'username': 'Username',
@@ -101,7 +105,8 @@ TRANSLATIONS = {
         'no_action': 'No action',
         'settings_saved': 'Settings saved!',
         'confirm_reset': 'Really reset statistics?',
-        'language': 'Language'
+        'language': 'Language',
+        'admin_dashboard': 'Admin'
     }
 }
 
@@ -148,6 +153,10 @@ REMOTE_ADB = "adb-proxy:46795"
 app = Flask(__name__)
 app.secret_key = 'dein-geheimer-schluessel-aendern!'  # WICHTIG: Ändern!
 
+# Flask App Setup
+app = Flask(__name__)
+app.secret_key = 'dein-geheimer-schluessel-aendern!'  # WICHTIG: Ändern!
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -155,6 +164,104 @@ login_manager.login_view = 'login'
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ================== User Management ==================
+
+USERS_FILE = "users.json"
+AUDIT_LOG_FILE = "audit_log.json"
+
+class User:
+    def __init__(self, username, password_hash, role, blocked=False):
+        self.username = username
+        self.password_hash = password_hash
+        self.role = role  # 'admin', 'user'
+        self.blocked = blocked
+    
+    def is_authenticated(self):
+        return True
+    
+    def is_active(self):
+        return not self.blocked
+    
+    def is_anonymous(self):
+        return False
+    
+    def get_id(self):
+        return self.username
+
+def init_users():
+    """Initialisiere User-Datenbank"""
+    if not os.path.exists(USERS_FILE):
+        users = {
+            'admin': {
+                'password': generate_password_hash('rREq8/1F4m#'),
+                'role': 'admin',
+                'blocked': False
+            },
+            'All4One': {
+                'password': generate_password_hash('52B1z_'),
+                'role': 'user',
+                'blocked': False
+            },
+            'Server39': {
+                'password': generate_password_hash('!3Z4d5'),
+                'role': 'user',
+                'blocked': False
+            }
+        }
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users, f, indent=2)
+
+def load_users():
+    """Lade User-Datenbank"""
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_users(users):
+    """Speichere User-Datenbank"""
+    with open(USERS_FILE, 'w') as f:
+        json.dump(users, f, indent=2)
+
+def log_audit(username, action, details=""):
+    """Log Benutzeraktionen"""
+    if not os.path.exists(AUDIT_LOG_FILE):
+        logs = []
+    else:
+        with open(AUDIT_LOG_FILE, 'r') as f:
+            logs = json.load(f)
+    
+    from datetime import datetime
+    import pytz
+    
+    # Deutsche Zeit
+    tz = pytz.timezone('Europe/Berlin')
+    timestamp = datetime.now(tz).strftime('%d.%m.%Y %H:%M:%S')
+    
+    logs.append({
+        'username': username,
+        'action': action,
+        'details': details,
+        'timestamp': timestamp
+    })
+    
+    # Nur letzte 500 Einträge behalten
+    logs = logs[-500:]
+    
+    with open(AUDIT_LOG_FILE, 'w') as f:
+        json.dump(logs, f, indent=2)
+
+@login_manager.user_loader
+def load_user(username):
+    users = load_users()
+    if username in users:
+        user_data = users[username]
+        return User(username, user_data['password'], user_data['role'], user_data.get('blocked', False))
+    return None
+
+# Initialisiere Users beim Start
+init_users()
 
 # ================== Bot-Steuerung ==================
 
@@ -166,6 +273,8 @@ class BotController:
         self.ssh_process = None
         self.status = "Gestoppt"
         self.last_action = ""
+        self.lock = threading.Lock()  # Thread-Lock für Queue
+        self.current_user = None  # Aktuell aktiver User
         
         # Einstellungen
         self.use_limit = False
@@ -528,24 +637,6 @@ bot = BotController()
 
 # ================== User Management ==================
 
-class User(UserMixin):
-    def __init__(self, id, username, password_hash):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-
-# Benutzer-Datenbank (in Produktion: echte DB verwenden!)
-users_db = {
-    'admin': User('1', 'admin', generate_password_hash('admin123'))  # WICHTIG: Passwort ändern!
-}
-
-@login_manager.user_loader
-def load_user(user_id):
-    for user in users_db.values():
-        if user.id == user_id:
-            return user
-    return None
-
 # ================== Flask Routes ==================
 
 def get_language():
@@ -570,26 +661,35 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        user = users_db.get(username)
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            return redirect(url_for('index'))
-        else:
-            error = translate('invalid_credentials')
-            return render_template('login.html', error=error, t=translate, lang=get_language())
+        users = load_users()
+        if username in users:
+            user_data = users[username]
+            if user_data.get('blocked', False):
+                error = "Benutzer ist gesperrt"
+                return render_template('login.html', error=error, t=translate, lang=get_language())
+            
+            if check_password_hash(user_data['password'], password):
+                user = User(username, user_data['password'], user_data['role'], user_data.get('blocked', False))
+                login_user(user)
+                log_audit(username, 'Login', '')
+                return redirect(url_for('index'))
+        
+        error = translate('invalid_credentials')
+        return render_template('login.html', error=error, t=translate, lang=get_language())
     
     return render_template('login.html', t=translate, lang=get_language())
 
 @app.route('/logout')
 @login_required
 def logout():
+    log_audit(current_user.username, 'Logout', '')
     logout_user()
     return redirect(url_for('login'))
 
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', t=translate, lang=get_language())
+    return render_template('index.html', t=translate, lang=get_language(), user=current_user)
 
 @app.route('/api/status')
 @login_required
@@ -602,38 +702,66 @@ def api_status():
         'trucks_processed': bot.trucks_processed,
         'trucks_shared': bot.trucks_shared,
         'trucks_skipped': bot.trucks_skipped,
-        'adb_connected': bot.adb_connected
+        'adb_connected': bot.adb_connected,
+        'current_user': bot.current_user
     })
 
 @app.route('/api/start', methods=['POST'])
 @login_required
 def api_start():
-    bot.start()
+    # Queue-System: Admin hat Priorität
+    users = load_users()
+    if current_user.username in users and users[current_user.username].get('blocked', False):
+        return jsonify({'error': 'User is blocked'}), 403
+    
+    with bot.lock:
+        if bot.current_user and bot.current_user != current_user.username:
+            if current_user.role != 'admin':
+                return jsonify({'error': f'Bot wird bereits von {bot.current_user} verwendet'}), 409
+            # Admin übernimmt
+            bot.stop()
+        
+        bot.current_user = current_user.username
+        bot.start()
+        log_audit(current_user.username, 'Start Bot', '')
+    
     return jsonify({'success': True})
 
 @app.route('/api/pause', methods=['POST'])
 @login_required
 def api_pause():
     bot.pause()
+    log_audit(current_user.username, 'Pause Bot', '')
     return jsonify({'success': True})
 
 @app.route('/api/stop', methods=['POST'])
 @login_required
 def api_stop():
-    bot.stop()
+    with bot.lock:
+        bot.stop()
+        bot.current_user = None
+        log_audit(current_user.username, 'Stop Bot', '')
     return jsonify({'success': True})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
     if request.method == 'POST':
+        # Prüfe ob User gesperrt ist
+        users = load_users()
+        if current_user.username in users and users[current_user.username].get('blocked', False):
+            return jsonify({'error': 'User is blocked'}), 403
+        
         data = request.json
         bot.use_limit = data.get('use_limit', False)
         bot.strength_limit = float(data.get('strength_limit', 60))
         bot.use_server_filter = data.get('use_server_filter', False)
         bot.server_number = data.get('server_number', '49')
         bot.reset_interval = int(data.get('reset_interval', 15))
-        bot.share_mode = data.get('share_mode', 'world')  # NEU: Share-Modus
+        bot.share_mode = data.get('share_mode', 'world')
+        
+        log_audit(current_user.username, 'Change Settings', f"limit={data.get('use_limit')}, strength={data.get('strength_limit')}, server={data.get('server_number')}, mode={data.get('share_mode')}")
+        
         return jsonify({'success': True})
     else:
         return jsonify({
@@ -642,7 +770,7 @@ def api_settings():
             'use_server_filter': bot.use_server_filter,
             'server_number': bot.server_number,
             'reset_interval': bot.reset_interval,
-            'share_mode': bot.share_mode  # NEU: Share-Modus
+            'share_mode': bot.share_mode
         })
 
 @app.route('/api/reset_stats', methods=['POST'])
@@ -651,7 +779,131 @@ def api_reset_stats():
     bot.trucks_processed = 0
     bot.trucks_shared = 0
     bot.trucks_skipped = 0
+    log_audit(current_user.username, 'Reset Statistics', '')
     return jsonify({'success': True})
+
+# ================== Admin Routes ==================
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    return render_template('admin.html', t=translate, lang=get_language(), user=current_user)
+
+@app.route('/api/admin/users', methods=['GET'])
+@login_required
+def api_admin_get_users():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    users = load_users()
+    user_list = []
+    for username, data in users.items():
+        user_list.append({
+            'username': username,
+            'role': data['role'],
+            'blocked': data.get('blocked', False)
+        })
+    return jsonify({'users': user_list})
+
+@app.route('/api/admin/users/<username>/block', methods=['POST'])
+@login_required
+def api_admin_block_user(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    users = load_users()
+    if username in users and username != 'admin':
+        users[username]['blocked'] = True
+        save_users(users)
+        log_audit(current_user.username, 'Block User', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/admin/users/<username>/unblock', methods=['POST'])
+@login_required
+def api_admin_unblock_user(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    users = load_users()
+    if username in users:
+        users[username]['blocked'] = False
+        save_users(users)
+        log_audit(current_user.username, 'Unblock User', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/admin/users', methods=['POST'])
+@login_required
+def api_admin_add_user():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role', 'user')
+    
+    users = load_users()
+    if username in users:
+        return jsonify({'error': 'User already exists'}), 400
+    
+    users[username] = {
+        'password': generate_password_hash(password),
+        'role': role,
+        'blocked': False
+    }
+    save_users(users)
+    log_audit(current_user.username, 'Add User', username)
+    return jsonify({'success': True})
+
+@app.route('/api/admin/users/<username>', methods=['DELETE'])
+@login_required
+def api_admin_delete_user(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if username == 'admin':
+        return jsonify({'error': 'Cannot delete admin'}), 400
+    
+    users = load_users()
+    if username in users:
+        del users[username]
+        save_users(users)
+        log_audit(current_user.username, 'Delete User', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/admin/users/<username>/password', methods=['POST'])
+@login_required
+def api_admin_change_password(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.json
+    new_password = data.get('password')
+    
+    users = load_users()
+    if username in users:
+        users[username]['password'] = generate_password_hash(new_password)
+        save_users(users)
+        log_audit(current_user.username, 'Change Password', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/admin/audit', methods=['GET'])
+@login_required
+def api_admin_get_audit():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if os.path.exists(AUDIT_LOG_FILE):
+        with open(AUDIT_LOG_FILE, 'r') as f:
+            logs = json.load(f)
+        return jsonify({'logs': logs[-100:]})  # Letzte 100 Einträge
+    return jsonify({'logs': []})
 
 if __name__ == '__main__':
     # Für Raspberry Pi: Lausche auf allen Interfaces
