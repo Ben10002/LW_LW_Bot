@@ -329,11 +329,23 @@
 </head>
 <body>
     <!-- Maintenance Overlay -->
-    <div id="maintenanceOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 40px; border-radius: 15px; text-align: center; max-width: 500px;">
-            <h2 style="color: #667eea; margin-bottom: 20px;">⚠️ Wartungsmodus</h2>
-            <p style="font-size: 18px; margin-bottom: 10px;">{{ 'Bot wird gewartet' if lang == 'de' else 'Bot under maintenance' }}</p>
-            <p style="color: #6c757d;">{{ 'Der Bot ist bald wieder verfügbar' if lang == 'de' else 'The bot will be available soon' }}</p>
+    <div id="maintenanceOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
+        <div style="background: white; padding: 50px 40px; border-radius: 20px; text-align: center; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div style="font-size: 64px; margin-bottom: 20px;">🛠️</div>
+            <h2 style="color: #667eea; margin-bottom: 15px; font-size: 28px;">
+                {{ 'Wartungsmodus' if lang == 'de' else 'Maintenance Mode' }}
+            </h2>
+            <p style="font-size: 18px; margin-bottom: 10px; color: #333;">
+                {{ 'Der Bot wird gerade gewartet.' if lang == 'de' else 'The bot is currently under maintenance.' }}
+            </p>
+            <p style="color: #6c757d; font-size: 16px; line-height: 1.6;">
+                {{ 'Dies kann aufgrund kürzlicher Serverwartungen oder technischer Probleme sein. Der Bot wird in Kürze wieder verfügbar sein.' if lang == 'de' else 'This may be due to recent server maintenance or technical issues. The bot will be available again shortly.' }}
+            </p>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+                <p style="color: #999; font-size: 14px;">
+                    {{ 'Bitte versuchen Sie es später erneut.' if lang == 'de' else 'Please try again later.' }}
+                </p>
+            </div>
         </div>
     </div>
     

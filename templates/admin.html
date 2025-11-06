@@ -98,6 +98,7 @@
             padding: 25px;
             border-radius: 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow-x: auto;
         }
         
         .card h2 {
@@ -111,6 +112,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: auto;
         }
         
         thead {
@@ -119,8 +121,14 @@
         
         th, td {
             text-align: left;
-            padding: 12px;
+            padding: 10px 8px;
             border-bottom: 1px solid #dee2e6;
+            white-space: nowrap;
+        }
+        
+        td:last-child {
+            white-space: normal;
+            min-width: 280px;
         }
         
         th {
@@ -157,12 +165,14 @@
         
         .action-btns {
             display: flex;
-            gap: 8px;
+            gap: 5px;
+            flex-wrap: wrap;
         }
         
         .action-btns button {
-            padding: 6px 12px;
-            font-size: 12px;
+            padding: 5px 10px;
+            font-size: 11px;
+            white-space: nowrap;
         }
         
         .form-group {
