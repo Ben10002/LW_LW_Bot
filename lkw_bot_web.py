@@ -15,7 +15,7 @@ import os
 import re
 import threading
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -113,6 +113,8 @@ TRANSLATIONS = {
 # Konfiguration
 TEMPLATE_PATH = 'rentier_template.png'
 STAERKENFILE = "lkw_staerken.txt"
+TRUCK_DATA_FILE = "truck_data.json"  # NEU: Detaillierte Truck-Daten
+MAINTENANCE_MODE_FILE = "maintenance_mode.json"  # NEU: Wartungsmodus
 
 # Koordinaten umgerechnet von 1600x900 auf 720x1280
 # Umrechnungsfaktor: x * 0.45, y * 1.422
@@ -169,13 +171,17 @@ logger = logging.getLogger(__name__)
 
 USERS_FILE = "users.json"
 AUDIT_LOG_FILE = "audit_log.json"
+STATS_FILE = "truck_stats.json"
+MAINTENANCE_FILE = "maintenance.json"
 
 class User:
-    def __init__(self, username, password_hash, role, blocked=False):
+    def __init__(self, username, password_hash, role, blocked=False, can_choose_share_mode=True, forced_share_mode=None):
         self.username = username
         self.password_hash = password_hash
         self.role = role  # 'admin', 'user'
         self.blocked = blocked
+        self.can_choose_share_mode = can_choose_share_mode  # Darf User wählen?
+        self.forced_share_mode = forced_share_mode  # 'world', 'alliance' oder None
     
     def is_authenticated(self):
         return True
@@ -196,17 +202,23 @@ def init_users():
             'admin': {
                 'password': generate_password_hash('rREq8/1F4m#'),
                 'role': 'admin',
-                'blocked': False
+                'blocked': False,
+                'can_choose_share_mode': True,
+                'forced_share_mode': None
             },
             'All4One': {
                 'password': generate_password_hash('52B1z_'),
                 'role': 'user',
-                'blocked': False
+                'blocked': False,
+                'can_choose_share_mode': True,
+                'forced_share_mode': None
             },
             'Server39': {
                 'password': generate_password_hash('!3Z4d5'),
                 'role': 'user',
-                'blocked': False
+                'blocked': False,
+                'can_choose_share_mode': True,
+                'forced_share_mode': None
             }
         }
         with open(USERS_FILE, 'w') as f:
@@ -257,7 +269,14 @@ def load_user(username):
     users = load_users()
     if username in users:
         user_data = users[username]
-        return User(username, user_data['password'], user_data['role'], user_data.get('blocked', False))
+        return User(
+            username, 
+            user_data['password'], 
+            user_data['role'], 
+            user_data.get('blocked', False),
+            user_data.get('can_choose_share_mode', True),
+            user_data.get('forced_share_mode', None)
+        )
     return None
 
 # Initialisiere Users beim Start
@@ -273,22 +292,90 @@ class BotController:
         self.ssh_process = None
         self.status = "Gestoppt"
         self.last_action = ""
-        self.lock = threading.Lock()  # Thread-Lock für Queue
-        self.current_user = None  # Aktuell aktiver User
+        self.lock = threading.Lock()
+        self.current_user = None
         
         # Einstellungen
         self.use_limit = False
         self.strength_limit = 60.0
         self.use_server_filter = False
         self.server_number = "49"
-        self.reset_interval = 15  # Minuten
-        self.share_mode = "world"  # "world" oder "alliance" - für zukünftige Erweiterung
+        self.reset_interval = 15
+        self.share_mode = "world"
         self.adb_connected = False
+        
+        # Fehlerüberwachung
+        self.last_success_time = time.time()
+        self.error_count = 0
+        self.maintenance_mode = self.load_maintenance_mode()
         
         # Statistiken
         self.trucks_processed = 0
         self.trucks_shared = 0
         self.trucks_skipped = 0
+        
+        # Maintenance Mode
+        self.maintenance_mode = self.load_maintenance_mode()
+        self.last_success_time = time.time()  # Letzte erfolgreiche Aktion
+        self.no_truck_threshold = 300  # 5 Minuten ohne Fund = Problem
+        
+    def load_maintenance_mode(self):
+        """Lade Maintenance-Status"""
+        if os.path.exists(MAINTENANCE_FILE):
+            with open(MAINTENANCE_FILE, 'r') as f:
+                data = json.load(f)
+                return data.get('enabled', False)
+        return False
+    
+    def set_maintenance_mode(self, enabled):
+        """Setze Maintenance-Mode"""
+        self.maintenance_mode = enabled
+        with open(MAINTENANCE_FILE, 'w') as f:
+            json.dump({'enabled': enabled}, f)
+        logger.info(f"Maintenance Mode: {'Aktiviert' if enabled else 'Deaktiviert'}")
+    
+    def check_auto_maintenance(self):
+        """Prüfe ob automatischer Maintenance-Mode aktiviert werden soll"""
+        if self.maintenance_mode:
+            return  # Bereits im Maintenance-Mode
+        
+        time_since_success = time.time() - self.last_success_time
+        if time_since_success > self.no_truck_threshold:
+            logger.warning(f"Keine LKWs seit {int(time_since_success)}s - aktiviere Maintenance-Mode")
+            self.set_maintenance_mode(True)
+    
+    def log_truck_stat(self, strength, server):
+        """Speichere Truck-Statistik"""
+        if not os.path.exists(STATS_FILE):
+            stats = []
+        else:
+            with open(STATS_FILE, 'r') as f:
+                stats = json.load(f)
+        
+        from datetime import datetime
+        import pytz
+        tz = pytz.timezone('Europe/Berlin')
+        timestamp = datetime.now(tz).isoformat()
+        
+        stats.append({
+            'timestamp': timestamp,
+            'strength': strength,
+            'server': server,
+            'user': self.current_user
+        })
+        
+        # Nur letzte 30 Tage behalten
+        cutoff = datetime.now(tz) - timedelta(days=30)
+        stats = [s for s in stats if datetime.fromisoformat(s['timestamp']) > cutoff]
+        
+        with open(STATS_FILE, 'w') as f:
+            json.dump(stats, f, indent=2)
+        
+        # Erfolgreich → Reset Timer
+        self.last_success_time = time.time()
+        if self.maintenance_mode:
+            logger.info("LKW gefunden - deaktiviere Maintenance-Mode")
+            self.set_maintenance_mode(False)
         
     def setup_ssh_tunnel(self):
         """Erstellt SSH-Tunnel zu VMOSCloud"""
@@ -468,6 +555,69 @@ class BotController:
             f.write(staerke + "\n")
         logger.info(f"Stärke {staerke} notiert")
     
+    def save_truck_data(self, staerke, server):
+        """Speichert detaillierte Truck-Daten für Statistiken"""
+        try:
+            # Lade existierende Daten
+            if os.path.exists(TRUCK_DATA_FILE):
+                with open(TRUCK_DATA_FILE, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = []
+            
+            # Deutsche Zeit
+            tz = pytz.timezone('Europe/Berlin')
+            timestamp = datetime.now(tz).isoformat()
+            
+            # Neuen Eintrag hinzufügen
+            data.append({
+                'timestamp': timestamp,
+                'strength': staerke,
+                'server': server,
+                'user': self.current_user
+            })
+            
+            # Alte Daten löschen (älter als 30 Tage)
+            cutoff = datetime.now(tz) - timedelta(days=30)
+            data = [d for d in data if datetime.fromisoformat(d['timestamp']) > cutoff]
+            
+            # Speichern
+            with open(TRUCK_DATA_FILE, 'w') as f:
+                json.dump(data, f, indent=2)
+                
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern der Truck-Daten: {e}")
+    
+    def save_maintenance_mode(self, enabled):
+        """Speichert Wartungsmodus-Status"""
+        try:
+            with open(MAINTENANCE_MODE_FILE, 'w') as f:
+                json.dump({'enabled': enabled, 'timestamp': datetime.now().isoformat()}, f)
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern des Wartungsmodus: {e}")
+    
+    def load_maintenance_mode(self):
+        """Lädt Wartungsmodus-Status"""
+        try:
+            if os.path.exists(MAINTENANCE_MODE_FILE):
+                with open(MAINTENANCE_MODE_FILE, 'r') as f:
+                    data = json.load(f)
+                    return data.get('enabled', False)
+            return False
+        except Exception as e:
+            logger.error(f"Fehler beim Laden des Wartungsmodus: {e}")
+            return False
+    
+    def set_maintenance_mode(self, enabled):
+        """Setzt Wartungsmodus (nur Admin)"""
+        self.maintenance_mode = enabled
+        self.save_maintenance_mode(enabled)
+        if not enabled:
+            # Reset Error-Counter bei manueller Deaktivierung
+            self.last_success_time = time.time()
+            self.error_count = 0
+        logger.info(f"Wartungsmodus {'aktiviert' if enabled else 'deaktiviert'}")
+    
     def reset_staerken(self):
         """Löscht Stärken-Liste"""
         try:
@@ -573,6 +723,9 @@ class BotController:
                 self.last_action = f"Teile LKW (Stärke: {staerke})"
                 self.notiere_staerke(staerke)
                 
+                # Server auslesen für Statistik
+                server = self.ocr_server() if self.use_server_filter else "Unknown"
+                
                 # Wähle Koordinaten basierend auf share_mode
                 if self.share_mode == "alliance":
                     coords = COORDS_ALLIANCE
@@ -592,10 +745,16 @@ class BotController:
                 self.trucks_processed += 1
                 self.last_action = f"LKW erfolgreich geteilt! ({self.trucks_shared} gesamt)"
                 
+                # Statistik speichern
+                self.log_truck_stat(staerke, server)
+                
             except Exception as e:
                 logger.error(f"Fehler in Bot-Schleife: {e}")
                 self.last_action = f"Fehler: {str(e)}"
                 time.sleep(5)
+            
+            # Prüfe Maintenance-Mode
+            self.check_auto_maintenance()
         
         # Cleanup
         self.close_ssh_tunnel()
@@ -703,7 +862,8 @@ def api_status():
         'trucks_shared': bot.trucks_shared,
         'trucks_skipped': bot.trucks_skipped,
         'adb_connected': bot.adb_connected,
-        'current_user': bot.current_user
+        'current_user': bot.current_user,
+        'maintenance_mode': bot.maintenance_mode
     })
 
 @app.route('/api/start', methods=['POST'])
@@ -758,19 +918,34 @@ def api_settings():
         bot.use_server_filter = data.get('use_server_filter', False)
         bot.server_number = data.get('server_number', '49')
         bot.reset_interval = int(data.get('reset_interval', 15))
-        bot.share_mode = data.get('share_mode', 'world')
         
-        log_audit(current_user.username, 'Change Settings', f"limit={data.get('use_limit')}, strength={data.get('strength_limit')}, server={data.get('server_number')}, mode={data.get('share_mode')}")
+        # Share-Mode: Prüfe ob User wählen darf
+        user_data = users.get(current_user.username, {})
+        if user_data.get('can_choose_share_mode', True):
+            bot.share_mode = data.get('share_mode', 'world')
+        else:
+            # User darf nicht wählen - nutze forced_mode
+            bot.share_mode = user_data.get('forced_share_mode', 'world')
+        
+        log_audit(current_user.username, 'Change Settings', f"limit={data.get('use_limit')}, strength={data.get('strength_limit')}, server={data.get('server_number')}, mode={bot.share_mode}")
         
         return jsonify({'success': True})
     else:
+        # Prüfe ob User share_mode wählen darf
+        users = load_users()
+        user_data = users.get(current_user.username, {})
+        can_choose = user_data.get('can_choose_share_mode', True)
+        forced_mode = user_data.get('forced_share_mode', None)
+        
         return jsonify({
             'use_limit': bot.use_limit,
             'strength_limit': bot.strength_limit,
             'use_server_filter': bot.use_server_filter,
             'server_number': bot.server_number,
             'reset_interval': bot.reset_interval,
-            'share_mode': bot.share_mode
+            'share_mode': forced_mode if forced_mode and not can_choose else bot.share_mode,
+            'can_choose_share_mode': can_choose,
+            'forced_share_mode': forced_mode
         })
 
 @app.route('/api/reset_stats', methods=['POST'])
@@ -790,6 +965,13 @@ def admin_dashboard():
     if current_user.role != 'admin':
         return redirect(url_for('index'))
     return render_template('admin.html', t=translate, lang=get_language(), user=current_user)
+
+@app.route('/admin/stats')
+@login_required
+def admin_stats_page():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    return render_template('stats.html', t=translate, lang=get_language(), user=current_user)
 
 @app.route('/api/admin/users', methods=['GET'])
 @login_required
@@ -902,8 +1084,72 @@ def api_admin_get_audit():
     if os.path.exists(AUDIT_LOG_FILE):
         with open(AUDIT_LOG_FILE, 'r') as f:
             logs = json.load(f)
-        return jsonify({'logs': logs[-100:]})  # Letzte 100 Einträge
+        return jsonify({'logs': logs[-100:]})
     return jsonify({'logs': []})
+
+@app.route('/api/admin/users/<username>/share_mode', methods=['POST'])
+@login_required
+def api_admin_set_share_mode(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.json
+    can_choose = data.get('can_choose', True)
+    forced_mode = data.get('forced_mode', None)
+    
+    users = load_users()
+    if username in users:
+        users[username]['can_choose_share_mode'] = can_choose
+        users[username]['forced_share_mode'] = forced_mode
+        save_users(users)
+        log_audit(current_user.username, 'Set Share Mode', f"{username}: can_choose={can_choose}, forced={forced_mode}")
+        return jsonify({'success': True})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/admin/maintenance', methods=['GET', 'POST'])
+@login_required
+def api_admin_maintenance():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if request.method == 'POST':
+        data = request.json
+        enabled = data.get('enabled', False)
+        bot.set_maintenance_mode(enabled)
+        log_audit(current_user.username, 'Set Maintenance Mode', f"enabled={enabled}")
+        return jsonify({'success': True})
+    else:
+        return jsonify({'enabled': bot.maintenance_mode})
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+def api_admin_get_stats():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    if not os.path.exists(TRUCK_DATA_FILE):
+        return jsonify({'trucks': []})
+    
+    with open(TRUCK_DATA_FILE, 'r') as f:
+        trucks = json.load(f)
+    
+    # Filtern nach Datum
+    if start_date and end_date:
+        tz = pytz.timezone('Europe/Berlin')
+        start = datetime.fromisoformat(start_date).replace(tzinfo=tz)
+        end = datetime.fromisoformat(end_date).replace(tzinfo=tz)
+        
+        filtered = []
+        for truck in trucks:
+            truck_time = datetime.fromisoformat(truck['timestamp'])
+            if start <= truck_time <= end:
+                filtered.append(truck)
+        trucks = filtered
+    
+    return jsonify({'trucks': trucks})
 
 if __name__ == '__main__':
     # Für Raspberry Pi: Lausche auf allen Interfaces
