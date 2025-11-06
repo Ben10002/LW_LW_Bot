@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('app_title') }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .header-left {
+            flex: 1;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        h1 {
+            font-size: 24px;
+        }
+        
+        .language-switcher {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .lang-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+        
+        .lang-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+        
+        .lang-btn.active {
+            background: white;
+            color: #667eea;
+            border-color: white;
+        }
+        
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .status-bar {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.running {
+            background: #51cf66;
+        }
+        
+        .status-indicator.paused {
+            background: #ffd43b;
+        }
+        
+        .status-indicator.stopped {
+            background: #ff6b6b;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-text {
+            flex: 1;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .last-action {
+            font-size: 14px;
+            color: #777;
+            margin-top: 5px;
+        }
+        
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-start {
+            background: #51cf66;
+        }
+        
+        .btn-pause {
+            background: #ffd43b;
+            color: #333;
+        }
+        
+        .btn-stop {
+            background: #ff6b6b;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .radio-label:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+        
+        .radio-label input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .radio-label input[type="radio"]:checked + span {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .connection-status.connected {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .connection-status.disconnected {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .control-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>🚛 {{ t('app_title') }}</h1>
+                <small>{{ t('app_subtitle') }}</small>
+            </div>
+            <div class="header-right">
+                <div class="language-switcher">
+                    <a href="/set_language/de" class="lang-btn {{ 'active' if lang == 'de' else '' }}">DE</a>
+                    <a href="/set_language/en" class="lang-btn {{ 'active' if lang == 'en' else '' }}">EN</a>
+                </div>
+                <a href="/logout" class="logout-btn">{{ t('logout') }}</a>
+            </div>
+        </header>
+        
+        <div class="card">
+            <h2>{{ t('status') }}</h2>
+            <div class="status-bar">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <div>
+                    <div class="status-text" id="statusText">{{ t('loading') }}</div>
+                    <div class="last-action" id="lastAction"></div>
+                </div>
+                <span class="connection-status" id="adbStatus">{{ t('adb_disconnected') }}</span>
+            </div>
+            
+            <div class="control-buttons">
+                <button class="btn btn-start" onclick="startBot()">▶ {{ t('btn_start') }}</button>
+                <button class="btn btn-pause" onclick="pauseBot()">⏸ {{ t('btn_pause') }}</button>
+                <button class="btn btn-stop" onclick="stopBot()">⏹ {{ t('btn_stop') }}</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>{{ t('statistics') }}</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="trucksProcessed">0</div>
+                    <div class="stat-label">{{ t('processed') }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="trucksShared">0</div>
+                    <div class="stat-label">{{ t('shared') }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="trucksSkipped">0</div>
+                    <div class="stat-label">{{ t('skipped') }}</div>
+                </div>
+            </div>
+            <button class="btn btn-stop" onclick="resetStats()" style="width: auto; padding: 8px 16px; font-size: 14px;">
+                {{ t('reset_stats') }}
+            </button>
+        </div>
+        
+        <div class="card">
+            <h2>{{ t('settings') }}</h2>
+            <div class="settings-grid">
+                <div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="useLimit">
+                        <label for="useLimit" style="margin-bottom: 0;">{{ t('use_strength_limit') }}</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="strengthLimit">{{ t('max_strength') }}</label>
+                        <input type="number" id="strengthLimit" value="60" step="0.1">
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="useServerFilter">
+                        <label for="useServerFilter" style="margin-bottom: 0;">{{ t('filter_server') }}</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="serverNumber">{{ t('server_number') }}</label>
+                        <input type="text" id="serverNumber" value="49">
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="form-group">
+                        <label for="resetInterval">{{ t('reset_interval') }}</label>
+                        <input type="number" id="resetInterval" value="15" min="1">
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label>{{ t('share_mode') }}</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="shareMode" value="world" checked>
+                                <span>🌍 {{ t('share_world') }}</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="shareMode" value="alliance">
+                                <span>🛡️ {{ t('share_alliance') }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-start" onclick="saveSettings()" style="margin-top: 15px;">
+                💾 {{ t('save_settings') }}
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Übersetzungen für JavaScript
+        const translations = {
+            'stopped': '{{ t("stopped") }}',
+            'running': '{{ t("running") }}',
+            'paused': '{{ t("paused") }}',
+            'no_action': '{{ t("no_action") }}',
+            'adb_connected': '{{ t("adb_connected") }}',
+            'adb_disconnected': '{{ t("adb_disconnected") }}',
+            'settings_saved': '{{ t("settings_saved") }}',
+            'confirm_reset': '{{ t("confirm_reset") }}'
+        };
+        
+        // Status-Update alle 2 Sekunden
+        setInterval(updateStatus, 2000);
+        
+        // Initiales Laden
+        updateStatus();
+        loadSettings();
+        
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const indicator = document.getElementById('statusIndicator');
+                    const statusText = document.getElementById('statusText');
+                    const lastAction = document.getElementById('lastAction');
+                    const adbStatus = document.getElementById('adbStatus');
+                    
+                    // Status-Indikator
+                    indicator.className = 'status-indicator';
+                    if (data.running && !data.paused) {
+                        indicator.classList.add('running');
+                        statusText.textContent = data.status;
+                    } else if (data.paused) {
+                        indicator.classList.add('paused');
+                        statusText.textContent = translations.paused;
+                    } else {
+                        indicator.classList.add('stopped');
+                        statusText.textContent = translations.stopped;
+                    }
+                    
+                    // Letzte Aktion
+                    lastAction.textContent = data.last_action || translations.no_action;
+                    
+                    // ADB-Status
+                    adbStatus.className = 'connection-status';
+                    if (data.adb_connected) {
+                        adbStatus.classList.add('connected');
+                        adbStatus.textContent = translations.adb_connected;
+                    } else {
+                        adbStatus.classList.add('disconnected');
+                        adbStatus.textContent = translations.adb_disconnected;
+                    }
+                    
+                    // Statistiken
+                    document.getElementById('trucksProcessed').textContent = data.trucks_processed;
+                    document.getElementById('trucksShared').textContent = data.trucks_shared;
+                    document.getElementById('trucksSkipped').textContent = data.trucks_skipped;
+                })
+                .catch(error => console.error('Error updating status:', error));
+        }
+        
+        function loadSettings() {
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('useLimit').checked = data.use_limit;
+                    document.getElementById('strengthLimit').value = data.strength_limit;
+                    document.getElementById('useServerFilter').checked = data.use_server_filter;
+                    document.getElementById('serverNumber').value = data.server_number;
+                    document.getElementById('resetInterval').value = data.reset_interval;
+                    
+                    // Share-Modus setzen
+                    const shareMode = data.share_mode || 'world';
+                    document.querySelector(`input[name="shareMode"][value="${shareMode}"]`).checked = true;
+                })
+                .catch(error => console.error('Error loading settings:', error));
+        }
+        
+        function saveSettings() {
+            // Share-Modus auslesen
+            const shareMode = document.querySelector('input[name="shareMode"]:checked').value;
+            
+            const settings = {
+                use_limit: document.getElementById('useLimit').checked,
+                strength_limit: document.getElementById('strengthLimit').value,
+                use_server_filter: document.getElementById('useServerFilter').checked,
+                server_number: document.getElementById('serverNumber').value,
+                reset_interval: document.getElementById('resetInterval').value,
+                share_mode: shareMode  // NEU: Share-Modus
+            };
+            
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(translations.settings_saved);
+                }
+            })
+            .catch(error => console.error('Error saving settings:', error));
+        }
+        
+        function startBot() {
+            fetch('/api/start', { method: 'POST' })
+                .then(() => updateStatus())
+                .catch(error => console.error('Error starting bot:', error));
+        }
+        
+        function pauseBot() {
+            fetch('/api/pause', { method: 'POST' })
+                .then(() => updateStatus())
+                .catch(error => console.error('Error pausing bot:', error));
+        }
+        
+        function stopBot() {
+            fetch('/api/stop', { method: 'POST' })
+                .then(() => updateStatus())
+                .catch(error => console.error('Error stopping bot:', error));
+        }
+        
+        function resetStats() {
+            if (confirm(translations.confirm_reset)) {
+                fetch('/api/reset_stats', { method: 'POST' })
+                    .then(() => updateStatus())
+                    .catch(error => console.error('Error resetting stats:', error));
+            }
+        }
+    </script>
+</body>
+</html>
