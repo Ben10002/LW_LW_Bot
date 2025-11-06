@@ -262,6 +262,24 @@
         </div>
         
         <div class="dashboard-grid">
+            <!-- Wartungsmodus -->
+            <div class="card">
+                <h2>🛠️ Wartungsmodus</h2>
+                <p style="margin-bottom: 15px; color: #6c757d;">Aktiviere den Wartungsmodus um normale User auszusperren.</p>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <label style="font-weight: 600;">Status:</label>
+                    <span id="maintenanceStatus" class="badge badge-active">Inaktiv</span>
+                    <button id="maintenanceToggle" class="btn btn-warning" onclick="toggleMaintenance()">Aktivieren</button>
+                </div>
+            </div>
+            
+            <!-- Statistiken Link -->
+            <div class="card">
+                <h2>📊 Statistiken</h2>
+                <p style="margin-bottom: 15px; color: #6c757d;">Detaillierte Truck-Statistiken ansehen.</p>
+                <a href="/admin/stats" class="btn btn-primary">📈 Statistiken öffnen</a>
+            </div>
+            
             <!-- Benutzerverwaltung -->
             <div class="card">
                 <h2>👥 Benutzerverwaltung</h2>
@@ -334,6 +352,32 @@
         </div>
     </div>
     
+    <!-- Share Mode Modal -->
+    <div id="shareModeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeShareModeModal()">&times;</span>
+                <h3>Share-Modus Einstellungen</h3>
+            </div>
+            <input type="hidden" id="shareModeUsername">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="canChooseShareMode" checked>
+                    User darf Share-Modus wählen
+                </label>
+            </div>
+            <div class="form-group" id="forcedModeGroup">
+                <label>Erzwungener Modus (wenn User nicht wählen darf)</label>
+                <select id="forcedShareMode">
+                    <option value="">Keiner</option>
+                    <option value="world">Weltchat</option>
+                    <option value="alliance">A4O</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="saveShareMode()">Speichern</button>
+        </div>
+    </div>
+    
     <script>
         // Lade Benutzer
         function loadUsers() {
@@ -362,6 +406,7 @@
                             } else {
                                 actions += `<button class="btn btn-warning" onclick="blockUser('${user.username}')">Sperren</button>`;
                             }
+                            actions += `<button class="btn btn-primary" onclick="showShareModeModal('${user.username}')">Share-Modus</button>`;
                             actions += `<button class="btn btn-primary" onclick="showChangePasswordModal('${user.username}')">Passwort</button>`;
                             actions += `<button class="btn btn-danger" onclick="deleteUser('${user.username}')">Löschen</button>`;
                         } else {
@@ -517,14 +562,91 @@
             });
         }
         
+        // Share-Mode Modal
+        function showShareModeModal(username) {
+            document.getElementById('shareModeUsername').value = username;
+            document.getElementById('shareModeModal').style.display = 'block';
+        }
+        
+        function closeShareModeModal() {
+            document.getElementById('shareModeModal').style.display = 'none';
+        }
+        
+        function saveShareMode() {
+            const username = document.getElementById('shareModeUsername').value;
+            const canChoose = document.getElementById('canChooseShareMode').checked;
+            const forcedMode = document.getElementById('forcedShareMode').value || null;
+            
+            fetch(`/api/admin/users/${username}/share_mode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ can_choose: canChoose, forced_mode: forcedMode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeShareModeModal();
+                    loadAuditLog();
+                    alert('Share-Modus gespeichert!');
+                }
+            });
+        }
+        
+        // Wartungsmodus
+        function loadMaintenanceStatus() {
+            fetch('/api/admin/maintenance')
+                .then(response => response.json())
+                .then(data => {
+                    const status = document.getElementById('maintenanceStatus');
+                    const button = document.getElementById('maintenanceToggle');
+                    
+                    if (data.enabled) {
+                        status.textContent = 'Aktiv';
+                        status.className = 'badge badge-blocked';
+                        button.textContent = 'Deaktivieren';
+                        button.className = 'btn btn-success';
+                    } else {
+                        status.textContent = 'Inaktiv';
+                        status.className = 'badge badge-active';
+                        button.textContent = 'Aktivieren';
+                        button.className = 'btn btn-warning';
+                    }
+                });
+        }
+        
+        function toggleMaintenance() {
+            fetch('/api/admin/maintenance')
+                .then(response => response.json())
+                .then(data => {
+                    const newState = !data.enabled;
+                    
+                    return fetch('/api/admin/maintenance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled: newState })
+                    });
+                })
+                .then(() => {
+                    loadMaintenanceStatus();
+                    loadAuditLog();
+                });
+        }
+        
+        // Checkbox Toggle für Share-Mode
+        document.getElementById('canChooseShareMode').addEventListener('change', function() {
+            document.getElementById('forcedModeGroup').style.display = this.checked ? 'none' : 'block';
+        });
+        
         // Initial laden
         loadUsers();
         loadAuditLog();
+        loadMaintenanceStatus();
         
         // Auto-refresh alle 5 Sekunden
         setInterval(() => {
             loadUsers();
             loadAuditLog();
+            loadMaintenanceStatus();
         }, 5000);
     </script>
 </body>

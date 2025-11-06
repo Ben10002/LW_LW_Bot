@@ -328,7 +328,16 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Maintenance Overlay -->
+    <div id="maintenanceOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 40px; border-radius: 15px; text-align: center; max-width: 500px;">
+            <h2 style="color: #667eea; margin-bottom: 20px;">⚠️ Wartungsmodus</h2>
+            <p style="font-size: 18px; margin-bottom: 10px;">{{ 'Bot wird gewartet' if lang == 'de' else 'Bot under maintenance' }}</p>
+            <p style="color: #6c757d;">{{ 'Der Bot ist bald wieder verfügbar' if lang == 'de' else 'The bot will be available soon' }}</p>
+        </div>
+    </div>
+    
+    <div class="container" id="mainContainer">
         <header>
             <div class="header-left">
                 <h1>🚛 {{ t('app_title') }}</h1>
@@ -467,6 +476,21 @@
                     const lastAction = document.getElementById('lastAction');
                     const adbStatus = document.getElementById('adbStatus');
                     
+                    // Maintenance-Mode Check (nur für Nicht-Admins)
+                    const isAdmin = {{ 'true' if user.role == 'admin' else 'false' }};
+                    const maintenanceOverlay = document.getElementById('maintenanceOverlay');
+                    const mainContainer = document.getElementById('mainContainer');
+                    
+                    if (data.maintenance_mode && !isAdmin) {
+                        maintenanceOverlay.style.display = 'flex';
+                        mainContainer.style.opacity = '0.3';
+                        mainContainer.style.pointerEvents = 'none';
+                    } else {
+                        maintenanceOverlay.style.display = 'none';
+                        mainContainer.style.opacity = '1';
+                        mainContainer.style.pointerEvents = 'auto';
+                    }
+                    
                     // Status-Indikator
                     indicator.className = 'status-indicator';
                     if (data.running && !data.paused) {
@@ -514,6 +538,21 @@
                     // Share-Modus setzen
                     const shareMode = data.share_mode || 'world';
                     document.querySelector(`input[name="shareMode"][value="${shareMode}"]`).checked = true;
+                    
+                    // Prüfe ob User Share-Mode wählen darf
+                    const canChoose = data.can_choose_share_mode !== false;
+                    const radioButtons = document.querySelectorAll('input[name="shareMode"]');
+                    radioButtons.forEach(radio => {
+                        radio.disabled = !canChoose;
+                    });
+                    
+                    // Zeige Info wenn disabled
+                    if (!canChoose) {
+                        const modeText = data.forced_share_mode === 'alliance' ? '{{ t("share_alliance") }}' : '{{ t("share_world") }}';
+                        document.querySelector('.radio-group').insertAdjacentHTML('afterend', 
+                            `<small style="color: #6c757d; margin-top: 10px; display: block;">Admin hat ${modeText} festgelegt</small>`
+                        );
+                    }
                 })
                 .catch(error => console.error('Error loading settings:', error));
         }

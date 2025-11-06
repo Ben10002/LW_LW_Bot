@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistiken - LKW-Bot</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { background: white; padding: 20px 30px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.3s; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input { padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .stat-label { font-size: 14px; opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="color: #667eea;">📊 Truck-Statistiken</h1>
+                <small style="color: #6c757d;">Detaillierte Auswertung der geteilten LKWs</small>
+            </div>
+            <div>
+                <a href="/admin" class="btn btn-secondary">← Zurück</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">Zeitraum wählen</h2>
+            <div style="display: flex; gap: 15px; align-items: end;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Von:</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Bis:</label>
+                    <input type="date" id="endDate">
+                </div>
+                <button class="btn" style="background: #667eea; color: white;" onclick="loadStats()">📈 Laden</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="totalTrucks">0</div>
+                <div class="stat-label">Gesamt LKWs</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="avgStrength">0</div>
+                <div class="stat-label">Ø Stärke (M)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="maxStrength">0</div>
+                <div class="stat-label">Max Stärke (M)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="uniqueServers">0</div>
+                <div class="stat-label">Server</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">Stärke-Verteilung</h2>
+            <canvas id="strengthChart"></canvas>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">LKWs pro Tag</h2>
+            <canvas id="dailyChart"></canvas>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">Top Server</h2>
+            <canvas id="serverChart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        // Standard: Heute
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
+        document.getElementById('startDate').value = weekAgo;
+        document.getElementById('endDate').value = today;
+        
+        let charts = {};
+        
+        function loadStats() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            fetch(`/api/admin/stats?start=${start}T00:00:00&end=${end}T23:59:59`)
+                .then(r => r.json())
+                .then(data => {
+                    const trucks = data.trucks || [];
+                    
+                    // Stats berechnen
+                    document.getElementById('totalTrucks').textContent = trucks.length;
+                    
+                    if (trucks.length > 0) {
+                        const strengths = trucks.map(t => parseFloat(t.strength.replace('M', '').replace(',', '.')));
+                        const avg = (strengths.reduce((a,b) => a+b, 0) / strengths.length).toFixed(1);
+                        const max = Math.max(...strengths).toFixed(1);
+                        const servers = new Set(trucks.map(t => t.server)).size;
+                        
+                        document.getElementById('avgStrength').textContent = avg;
+                        document.getElementById('maxStrength').textContent = max;
+                        document.getElementById('uniqueServers').textContent = servers;
+                        
+                        // Charts
+                        updateCharts(trucks);
+                    }
+                });
+        }
+        
+        function updateCharts(trucks) {
+            // Destroy alte Charts
+            Object.values(charts).forEach(c => c && c.destroy());
+            
+            // Stärke-Verteilung
+            const strengths = trucks.map(t => parseFloat(t.strength.replace('M', '').replace(',', '.')));
+            const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+            const counts = bins.map((b, i) => strengths.filter(s => s >= b && s < (bins[i+1] || 999)).length);
+            
+            charts.strength = new Chart(document.getElementById('strengthChart'), {
+                type: 'bar',
+                data: {
+                    labels: bins.map((b, i) => `${b}-${bins[i+1] || '100+'}M`).slice(0, -1),
+                    datasets: [{
+                        label: 'Anzahl LKWs',
+                        data: counts.slice(0, -1),
+                        backgroundColor: '#667eea'
+                    }]
+                }
+            });
+            
+            // Daily
+            const daily = {};
+            trucks.forEach(t => {
+                const date = t.timestamp.split('T')[0];
+                daily[date] = (daily[date] || 0) + 1;
+            });
+            
+            charts.daily = new Chart(document.getElementById('dailyChart'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(daily).sort(),
+                    datasets: [{
+                        label: 'LKWs pro Tag',
+                        data: Object.values(daily),
+                        borderColor: '#667eea',
+                        tension: 0.4
+                    }]
+                }
+            });
+            
+            // Server
+            const servers = {};
+            trucks.forEach(t => servers[t.server] = (servers[t.server] || 0) + 1);
+            const topServers = Object.entries(servers).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            
+            charts.server = new Chart(document.getElementById('serverChart'), {
+                type: 'bar',
+                data: {
+                    labels: topServers.map(s => `Server ${s[0]}`),
+                    datasets: [{
+                        label: 'Anzahl LKWs',
+                        data: topServers.map(s => s[1]),
+                        backgroundColor: '#764ba2'
+                    }]
+                },
+                options: { indexAxis: 'y' }
+            });
+        }
+        
+        // Initial laden
+        loadStats();
+    </script>
+</body>
+</html>
