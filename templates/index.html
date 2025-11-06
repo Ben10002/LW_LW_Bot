@@ -339,6 +339,9 @@
                     <a href="/set_language/de" class="lang-btn {{ 'active' if lang == 'de' else '' }}">DE</a>
                     <a href="/set_language/en" class="lang-btn {{ 'active' if lang == 'en' else '' }}">EN</a>
                 </div>
+                {% if user.role == 'admin' %}
+                <a href="/admin" class="logout-btn" style="background: #667eea;">🛡️ {{ t('admin_dashboard') }}</a>
+                {% endif %}
                 <a href="/logout" class="logout-btn">{{ t('logout') }}</a>
             </div>
         </header>
@@ -525,7 +528,7 @@
                 use_server_filter: document.getElementById('useServerFilter').checked,
                 server_number: document.getElementById('serverNumber').value,
                 reset_interval: document.getElementById('resetInterval').value,
-                share_mode: shareMode  // NEU: Share-Modus
+                share_mode: shareMode
             };
             
             fetch('/api/settings', {
@@ -535,7 +538,15 @@
                 },
                 body: JSON.stringify(settings)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        alert(data.error || 'Fehler beim Speichern');
+                        throw new Error(data.error);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     alert(translations.settings_saved);
@@ -546,6 +557,15 @@
         
         function startBot() {
             fetch('/api/start', { method: 'POST' })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            alert(data.error || 'Fehler beim Starten');
+                            throw new Error(data.error);
+                        });
+                    }
+                    return response.json();
+                })
                 .then(() => updateStatus())
                 .catch(error => console.error('Error starting bot:', error));
         }

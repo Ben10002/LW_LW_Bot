@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - LKW-Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #f8f9fa;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        th {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-admin {
+            background: #667eea;
+            color: white;
+        }
+        
+        .badge-user {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .badge-blocked {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .badge-active {
+            background: #28a745;
+            color: white;
+        }
+        
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btns button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .audit-log {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            padding: 10px;
+            border-left: 3px solid #667eea;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        
+        .log-entry .timestamp {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .log-entry .user {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            color: #667eea;
+        }
+        
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #aaa;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🛡️ Admin Dashboard</h1>
+                <p style="color: #6c757d; margin-top: 5px;">Benutzerverwaltung & Audit-Log</p>
+            </div>
+            <div class="header-actions">
+                <a href="/" class="btn btn-secondary">← Zurück zum Bot</a>
+                <a href="/logout" class="btn btn-danger">Abmelden</a>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- Benutzerverwaltung -->
+            <div class="card">
+                <h2>👥 Benutzerverwaltung</h2>
+                <button class="btn btn-success" onclick="showAddUserModal()" style="margin-bottom: 15px;">+ Benutzer hinzufügen</button>
+                
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Benutzername</th>
+                            <th>Rolle</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr><td colspan="4">Lade...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Audit Log -->
+            <div class="card">
+                <h2>📋 Audit-Log (Letzte Aktionen)</h2>
+                <div class="audit-log" id="auditLog">
+                    <p>Lade...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeAddUserModal()">&times;</span>
+                <h3>Neuen Benutzer hinzufügen</h3>
+            </div>
+            <div class="form-group">
+                <label>Benutzername</label>
+                <input type="text" id="newUsername" placeholder="Benutzername">
+            </div>
+            <div class="form-group">
+                <label>Passwort</label>
+                <input type="password" id="newPassword" placeholder="Passwort">
+            </div>
+            <div class="form-group">
+                <label>Rolle</label>
+                <select id="newRole">
+                    <option value="user">Benutzer</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button class="btn btn-success" onclick="addUser()">Hinzufügen</button>
+        </div>
+    </div>
+    
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeChangePasswordModal()">&times;</span>
+                <h3>Passwort ändern</h3>
+            </div>
+            <input type="hidden" id="changePasswordUsername">
+            <div class="form-group">
+                <label>Neues Passwort</label>
+                <input type="password" id="changePassword" placeholder="Neues Passwort">
+            </div>
+            <button class="btn btn-primary" onclick="changePassword()">Passwort ändern</button>
+        </div>
+    </div>
+    
+    <script>
+        // Lade Benutzer
+        function loadUsers() {
+            fetch('/api/admin/users')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('usersTableBody');
+                    tbody.innerHTML = '';
+                    
+                    data.users.forEach(user => {
+                        const tr = document.createElement('tr');
+                        
+                        const roleBadge = user.role === 'admin' ? 
+                            '<span class="badge badge-admin">Admin</span>' : 
+                            '<span class="badge badge-user">Benutzer</span>';
+                        
+                        const statusBadge = user.blocked ? 
+                            '<span class="badge badge-blocked">Gesperrt</span>' : 
+                            '<span class="badge badge-active">Aktiv</span>';
+                        
+                        let actions = '<div class="action-btns">';
+                        
+                        if (user.username !== 'admin') {
+                            if (user.blocked) {
+                                actions += `<button class="btn btn-success" onclick="unblockUser('${user.username}')">Entsperren</button>`;
+                            } else {
+                                actions += `<button class="btn btn-warning" onclick="blockUser('${user.username}')">Sperren</button>`;
+                            }
+                            actions += `<button class="btn btn-primary" onclick="showChangePasswordModal('${user.username}')">Passwort</button>`;
+                            actions += `<button class="btn btn-danger" onclick="deleteUser('${user.username}')">Löschen</button>`;
+                        } else {
+                            actions += '<span style="color: #6c757d;">Admin (geschützt)</span>';
+                        }
+                        
+                        actions += '</div>';
+                        
+                        tr.innerHTML = `
+                            <td><strong>${user.username}</strong></td>
+                            <td>${roleBadge}</td>
+                            <td>${statusBadge}</td>
+                            <td>${actions}</td>
+                        `;
+                        
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+        
+        // Lade Audit-Log
+        function loadAuditLog() {
+            fetch('/api/admin/audit')
+                .then(response => response.json())
+                .then(data => {
+                    const auditLog = document.getElementById('auditLog');
+                    auditLog.innerHTML = '';
+                    
+                    if (data.logs.length === 0) {
+                        auditLog.innerHTML = '<p>Keine Einträge</p>';
+                        return;
+                    }
+                    
+                    data.logs.reverse().forEach(log => {
+                        const entry = document.createElement('div');
+                        entry.className = 'log-entry';
+                        entry.innerHTML = `
+                            <div class="timestamp">${log.timestamp}</div>
+                            <div><span class="user">${log.username}</span> → ${log.action}</div>
+                            ${log.details ? `<div style="font-size: 12px; color: #6c757d;">${log.details}</div>` : ''}
+                        `;
+                        auditLog.appendChild(entry);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+        
+        // Benutzer sperren
+        function blockUser(username) {
+            if (confirm(`Benutzer "${username}" wirklich sperren?`)) {
+                fetch(`/api/admin/users/${username}/block`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(() => {
+                        loadUsers();
+                        loadAuditLog();
+                    });
+            }
+        }
+        
+        // Benutzer entsperren
+        function unblockUser(username) {
+            fetch(`/api/admin/users/${username}/unblock`, { method: 'POST' })
+                .then(response => response.json())
+                .then(() => {
+                    loadUsers();
+                    loadAuditLog();
+                });
+        }
+        
+        // Benutzer löschen
+        function deleteUser(username) {
+            if (confirm(`Benutzer "${username}" wirklich löschen?`)) {
+                fetch(`/api/admin/users/${username}`, { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(() => {
+                        loadUsers();
+                        loadAuditLog();
+                    });
+            }
+        }
+        
+        // Benutzer hinzufügen Modal
+        function showAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'block';
+        }
+        
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'none';
+        }
+        
+        function addUser() {
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('newRole').value;
+            
+            if (!username || !password) {
+                alert('Bitte alle Felder ausfüllen!');
+                return;
+            }
+            
+            fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, role })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeAddUserModal();
+                    loadUsers();
+                    loadAuditLog();
+                    document.getElementById('newUsername').value = '';
+                    document.getElementById('newPassword').value = '';
+                } else {
+                    alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            });
+        }
+        
+        // Passwort ändern Modal
+        function showChangePasswordModal(username) {
+            document.getElementById('changePasswordUsername').value = username;
+            document.getElementById('changePasswordModal').style.display = 'block';
+        }
+        
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'none';
+        }
+        
+        function changePassword() {
+            const username = document.getElementById('changePasswordUsername').value;
+            const password = document.getElementById('changePassword').value;
+            
+            if (!password) {
+                alert('Bitte Passwort eingeben!');
+                return;
+            }
+            
+            fetch(`/api/admin/users/${username}/password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeChangePasswordModal();
+                    loadAuditLog();
+                    document.getElementById('changePassword').value = '';
+                    alert('Passwort erfolgreich geändert!');
+                }
+            });
+        }
+        
+        // Initial laden
+        loadUsers();
+        loadAuditLog();
+        
+        // Auto-refresh alle 5 Sekunden
+        setInterval(() => {
+            loadUsers();
+            loadAuditLog();
+        }, 5000);
+    </script>
+</body>
+</html>
