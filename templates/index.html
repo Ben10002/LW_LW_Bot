@@ -12,41 +12,43 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
         }
         
-        header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
             margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
         }
         
-        .header-left {
-            flex: 1;
+        .header-left h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .header-left .subtitle {
+            color: #6c757d;
+            font-size: 14px;
         }
         
         .header-right {
             display: flex;
-            gap: 10px;
+            gap: 15px;
             align-items: center;
-        }
-        
-        h1 {
-            font-size: 24px;
         }
         
         .language-switcher {
@@ -55,85 +57,97 @@
         }
         
         .lang-btn {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 2px solid rgba(255,255,255,0.3);
-            padding: 6px 12px;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 5px 10px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: 600;
             text-decoration: none;
             transition: all 0.3s;
-            font-size: 12px;
         }
         
         .lang-btn:hover {
-            background: rgba(255,255,255,0.3);
-            border-color: rgba(255,255,255,0.5);
+            background: #667eea;
+            color: white;
         }
         
         .lang-btn.active {
-            background: white;
-            color: #667eea;
-            border-color: white;
-        }
-        
-        .logout-btn {
-            background: rgba(255,255,255,0.2);
+            background: #667eea;
             color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: background 0.3s;
         }
         
-        .logout-btn:hover {
-            background: rgba(255,255,255,0.3);
+        .btn-logout, .btn-admin {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-logout:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        
+        .btn-admin {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-admin:hover {
+            background: #218838;
+            transform: translateY(-2px);
         }
         
         .card {
             background: white;
-            border-radius: 10px;
-            padding: 20px;
+            padding: 25px;
+            border-radius: 15px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
         
         .card h2 {
-            margin-bottom: 15px;
-            color: #333;
+            color: #667eea;
+            margin-bottom: 20px;
             font-size: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
         }
         
-        .status-bar {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 5px;
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
             margin-bottom: 20px;
         }
         
-        .status-indicator {
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            margin-right: 10px;
+            background: #dc3545;
             animation: pulse 2s infinite;
         }
         
-        .status-indicator.running {
-            background: #51cf66;
-        }
-        
-        .status-indicator.paused {
-            background: #ffd43b;
-        }
-        
-        .status-indicator.stopped {
-            background: #ff6b6b;
+        .status-dot.connected {
+            background: #28a745;
         }
         
         @keyframes pulse {
@@ -141,219 +155,243 @@
             50% { opacity: 0.5; }
         }
         
-        .status-text {
-            flex: 1;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .last-action {
-            font-size: 14px;
-            color: #777;
-            margin-top: 5px;
-        }
-        
         .control-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
         }
         
         .btn {
-            padding: 12px 20px;
+            flex: 1;
+            padding: 15px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
+            cursor: pointer;
             font-size: 16px;
             font-weight: 600;
-            cursor: pointer;
             transition: all 0.3s;
-            color: white;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
         }
         
         .btn-start {
-            background: #51cf66;
+            background: #28a745;
+            color: white;
         }
         
         .btn-pause {
-            background: #ffd43b;
-            color: #333;
+            background: #ffc107;
+            color: #000;
         }
         
         .btn-stop {
-            background: #ff6b6b;
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
             text-align: center;
         }
         
+        .stat-box {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
         .stat-value {
-            font-size: 32px;
-            font-weight: 700;
+            font-size: 28px;
+            font-weight: bold;
             margin-bottom: 5px;
         }
         
         .stat-label {
-            font-size: 14px;
+            font-size: 12px;
             opacity: 0.9;
         }
         
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
         
-        label {
+        .form-group label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: 600;
-            color: #555;
+            color: #495057;
         }
         
-        input[type="number"],
-        input[type="text"] {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
             font-size: 14px;
+            transition: border-color 0.3s;
         }
         
-        input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
         }
         
         .checkbox-group {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 15px;
         }
         
-        .radio-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .radio-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            transition: all 0.3s;
-        }
-        
-        .radio-label:hover {
-            border-color: #667eea;
-            background: #f8f9fa;
-        }
-        
-        .radio-label input[type="radio"] {
+        .checkbox-group input[type="checkbox"] {
             width: 20px;
             height: 20px;
             cursor: pointer;
         }
         
-        .radio-label input[type="radio"]:checked + span {
-            font-weight: 600;
-            color: #667eea;
-        }
-        
-        .settings-grid {
+        .row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 20px;
         }
         
-        .connection-status {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
+        .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
             font-weight: 600;
-            margin-left: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
         }
         
-        .connection-status.connected {
-            background: #51cf66;
-            color: white;
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
-        .connection-status.disconnected {
-            background: #ff6b6b;
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        
+        .alert.show {
+            display: block;
+        }
+        
+        .maintenance-mode {
+            background: #ffc107;
+            color: #000;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .current-user {
+            background: #e9ecef;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        .timer-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: 600;
+            border: 1px solid #bee5eb;
+        }
+        
+        .mode-request-btn {
+            background: #6c757d;
             color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+        
+        .mode-request-btn:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+        
+        .mode-request-info {
+            background: #fff3cd;
+            color: #856404;
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+            border: 1px solid #ffeeba;
         }
         
         @media (max-width: 768px) {
-            .control-buttons {
+            .status-grid, .stats-grid, .row {
                 grid-template-columns: 1fr;
             }
             
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            header {
+            .header {
                 flex-direction: column;
-                gap: 10px;
+                gap: 15px;
                 text-align: center;
+            }
+            
+            .header-right {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Maintenance Overlay -->
-    <div id="maintenanceOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
-        <div style="background: white; padding: 50px 40px; border-radius: 20px; text-align: center; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-            <div style="font-size: 64px; margin-bottom: 20px;">🛠️</div>
-            <h2 style="color: #667eea; margin-bottom: 15px; font-size: 28px;">
-                {{ 'Wartungsmodus' if lang == 'de' else 'Maintenance Mode' }}
-            </h2>
-            <p style="font-size: 18px; margin-bottom: 10px; color: #333;">
-                {{ 'Der Bot wird gerade gewartet.' if lang == 'de' else 'The bot is currently under maintenance.' }}
-            </p>
-            <p style="color: #6c757d; font-size: 16px; line-height: 1.6;">
-                {{ 'Dies kann aufgrund kürzlicher Serverwartungen oder technischer Probleme sein. Der Bot wird in Kürze wieder verfügbar sein.' if lang == 'de' else 'This may be due to recent server maintenance or technical issues. The bot will be available again shortly.' }}
-            </p>
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
-                <p style="color: #999; font-size: 14px;">
-                    {{ 'Bitte versuchen Sie es später erneut.' if lang == 'de' else 'Please try again later.' }}
-                </p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="container" id="mainContainer">
-        <header>
+    <div class="container">
+        <div class="header">
             <div class="header-left">
                 <h1>🚛 {{ t('app_title') }}</h1>
-                <small>{{ t('app_subtitle') }}</small>
+                <div class="subtitle">{{ t('app_subtitle') }}</div>
             </div>
             <div class="header-right">
                 <div class="language-switcher">
@@ -361,182 +399,300 @@
                     <a href="/set_language/en" class="lang-btn {{ 'active' if lang == 'en' else '' }}">EN</a>
                 </div>
                 {% if user.role == 'admin' %}
-                <a href="/admin" class="logout-btn" style="background: #667eea;">🛡️ {{ t('admin_dashboard') }}</a>
+                <a href="/admin" class="btn-admin">{{ t('admin_dashboard') }}</a>
                 {% endif %}
-                <a href="/logout" class="logout-btn">{{ t('logout') }}</a>
+                <a href="/logout" class="btn-logout">{{ t('logout') }}</a>
             </div>
-        </header>
+        </div>
+        
+        <div id="maintenanceAlert" class="maintenance-mode" style="display: none;">
+            ⚠️ Maintenance-Mode aktiv - Bot pausiert
+        </div>
+        
+        <div id="alerts"></div>
         
         <div class="card">
-            <h2>{{ t('status') }}</h2>
-            <div class="status-bar">
-                <div class="status-indicator" id="statusIndicator"></div>
-                <div>
-                    <div class="status-text" id="statusText">{{ t('loading') }}</div>
-                    <div class="last-action" id="lastAction"></div>
+            <h2>📊 {{ t('status') }}</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span>{{ t('status') }}: <strong id="statusText">{{ t('loading') }}</strong></span>
                 </div>
-                <span class="connection-status" id="adbStatus">{{ t('adb_disconnected') }}</span>
+                <div class="status-item">
+                    <div class="status-dot" id="adbDot"></div>
+                    <span id="adbStatus">{{ t('adb_disconnected') }}</span>
+                </div>
+                <div class="status-item">
+                    <span>{{ t('no_action') }}: <strong id="lastAction">-</strong></span>
+                </div>
+                <div class="status-item">
+                    <span id="currentUser" class="current-user">-</span>
+                </div>
+            </div>
+            
+            <div id="timerInfo" class="timer-info" style="display: none;">
+                ⏱️ {{ t('timer_remaining') }}: <span id="timerValue">--:--</span>
             </div>
             
             <div class="control-buttons">
-                <button class="btn btn-start" onclick="startBot()">▶ {{ t('btn_start') }}</button>
-                <button class="btn btn-pause" onclick="pauseBot()">⏸ {{ t('btn_pause') }}</button>
-                <button class="btn btn-stop" onclick="stopBot()">⏹ {{ t('btn_stop') }}</button>
+                <button id="btnStart" class="btn btn-start" onclick="startBot()">▶️ {{ t('btn_start') }}</button>
+                <button id="btnPause" class="btn btn-pause" onclick="pauseBot()" disabled>⏸️ {{ t('btn_pause') }}</button>
+                <button id="btnStop" class="btn btn-stop" onclick="stopBot()" disabled>⏹️ {{ t('btn_stop') }}</button>
             </div>
         </div>
         
         <div class="card">
-            <h2>{{ t('statistics') }}</h2>
+            <h2>📈 {{ t('statistics') }}</h2>
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-box">
                     <div class="stat-value" id="trucksProcessed">0</div>
                     <div class="stat-label">{{ t('processed') }}</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-box">
                     <div class="stat-value" id="trucksShared">0</div>
                     <div class="stat-label">{{ t('shared') }}</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-box">
                     <div class="stat-value" id="trucksSkipped">0</div>
                     <div class="stat-label">{{ t('skipped') }}</div>
                 </div>
             </div>
-            <button class="btn btn-stop" onclick="resetStats()" style="width: auto; padding: 8px 16px; font-size: 14px;">
-                {{ t('reset_stats') }}
-            </button>
+            <button class="btn-save" style="margin-top: 20px;" onclick="resetStats()">🔄 {{ t('reset_stats') }}</button>
         </div>
         
         <div class="card">
-            <h2>{{ t('settings') }}</h2>
-            <div class="settings-grid">
-                <div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="useLimit">
-                        <label for="useLimit" style="margin-bottom: 0;">{{ t('use_strength_limit') }}</label>
-                    </div>
+            <h2>⚙️ {{ t('settings') }}</h2>
+            <form id="settingsForm">
+                <div class="row">
                     <div class="form-group">
-                        <label for="strengthLimit">{{ t('max_strength') }}</label>
-                        <input type="number" id="strengthLimit" value="60" step="0.1">
-                    </div>
-                </div>
-                
-                <div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="useServerFilter">
-                        <label for="useServerFilter" style="margin-bottom: 0;">{{ t('filter_server') }}</label>
-                    </div>
-                    <div class="form-group">
-                        <label for="serverNumber">{{ t('server_number') }}</label>
-                        <input type="text" id="serverNumber" value="49">
-                    </div>
-                </div>
-                
-                <div>
-                    <div class="form-group">
-                        <label for="resetInterval">{{ t('reset_interval') }}</label>
-                        <input type="number" id="resetInterval" value="15" min="1">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="useLimit" name="use_limit">
+                            <label for="useLimit">{{ t('use_strength_limit') }}</label>
+                        </div>
+                        <input type="number" id="strengthLimit" name="strength_limit" value="60" min="1" max="999" style="margin-top: 10px;">
+                        <small style="color: #6c757d;">{{ t('max_strength') }}</small>
                     </div>
                     
-                    <div class="form-group" style="margin-top: 20px;">
-                        <label>{{ t('share_mode') }}</label>
-                        <div class="radio-group">
-                            <label class="radio-label">
-                                <input type="radio" name="shareMode" value="world" checked>
-                                <span>🌍 {{ t('share_world') }}</span>
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="shareMode" value="alliance">
-                                <span>🛡️ {{ t('share_alliance') }}</span>
-                            </label>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="useServerFilter" name="use_server_filter">
+                            <label for="useServerFilter">{{ t('filter_server') }}</label>
+                        </div>
+                        <input type="text" id="serverNumber" name="server_number" value="49" style="margin-top: 10px;">
+                        <small style="color: #6c757d;">{{ t('server_number') }}</small>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="form-group">
+                        <label for="resetInterval">{{ t('reset_interval') }}</label>
+                        <input type="number" id="resetInterval" name="reset_interval" value="15" min="5" max="120">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="shareMode">{{ t('share_mode') }}</label>
+                        <select id="shareMode" name="share_mode">
+                            <option value="world">🌍 {{ t('share_world') }}</option>
+                            <option value="alliance">🤝 {{ t('share_alliance') }}</option>
+                        </select>
+                        <div id="modeRequestContainer" style="display: none;">
+                            <div class="mode-request-info">
+                                ⚠️ Sie können den Modus nicht direkt ändern.
+                            </div>
+                            <button type="button" class="mode-request-btn" onclick="requestModeChange()">
+                                {{ t('request_mode_change') }}
+                            </button>
+                            <div id="modeRequestStatus"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <button class="btn btn-start" onclick="saveSettings()" style="margin-top: 15px;">
-                💾 {{ t('save_settings') }}
-            </button>
+                
+                <div class="row">
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="useTimer" name="use_timer">
+                            <label for="useTimer">{{ t('use_timer') }}</label>
+                        </div>
+                        <input type="number" id="timerDuration" name="timer_duration" value="60" min="1" max="720" style="margin-top: 10px;">
+                        <small style="color: #6c757d;">{{ t('timer_minutes') }}</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <!-- Platzhalter für Symmetrie -->
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-save">💾 {{ t('save_settings') }}</button>
+            </form>
         </div>
     </div>
     
     <script>
-        // Übersetzungen für JavaScript
-        const translations = {
-            'stopped': '{{ t("stopped") }}',
-            'running': '{{ t("running") }}',
-            'paused': '{{ t("paused") }}',
-            'no_action': '{{ t("no_action") }}',
-            'adb_connected': '{{ t("adb_connected") }}',
-            'adb_disconnected': '{{ t("adb_disconnected") }}',
-            'settings_saved': '{{ t("settings_saved") }}',
-            'confirm_reset': '{{ t("confirm_reset") }}'
-        };
+        let currentStatus = {};
+        let updateInterval;
         
-        // Status-Update alle 2 Sekunden
-        setInterval(updateStatus, 2000);
-        
-        // Initiales Laden
-        updateStatus();
-        loadSettings();
-        
+        // Status-Update
         function updateStatus() {
             fetch('/api/status')
                 .then(response => response.json())
                 .then(data => {
-                    const indicator = document.getElementById('statusIndicator');
+                    currentStatus = data;
+                    
+                    // Bot-Status
                     const statusText = document.getElementById('statusText');
-                    const lastAction = document.getElementById('lastAction');
-                    const adbStatus = document.getElementById('adbStatus');
+                    const statusDot = document.getElementById('statusDot');
                     
-                    // Maintenance-Mode Check (nur für Nicht-Admins)
-                    const isAdmin = {{ 'true' if user.role == 'admin' else 'false' }};
-                    const maintenanceOverlay = document.getElementById('maintenanceOverlay');
-                    const mainContainer = document.getElementById('mainContainer');
-                    
-                    if (data.maintenance_mode && !isAdmin) {
-                        maintenanceOverlay.style.display = 'flex';
-                        mainContainer.style.opacity = '0.3';
-                        mainContainer.style.pointerEvents = 'none';
+                    if (data.running) {
+                        if (data.paused) {
+                            statusText.textContent = '{{ t("paused") }}';
+                            statusDot.style.background = '#ffc107';
+                        } else {
+                            statusText.textContent = '{{ t("running") }}';
+                            statusDot.style.background = '#28a745';
+                        }
                     } else {
-                        maintenanceOverlay.style.display = 'none';
-                        mainContainer.style.opacity = '1';
-                        mainContainer.style.pointerEvents = 'auto';
+                        statusText.textContent = '{{ t("stopped") }}';
+                        statusDot.style.background = '#dc3545';
                     }
                     
-                    // Status-Indikator
-                    indicator.className = 'status-indicator';
-                    if (data.running && !data.paused) {
-                        indicator.classList.add('running');
-                        statusText.textContent = data.status;
-                    } else if (data.paused) {
-                        indicator.classList.add('paused');
-                        statusText.textContent = translations.paused;
+                    // ADB-Status
+                    const adbDot = document.getElementById('adbDot');
+                    const adbStatus = document.getElementById('adbStatus');
+                    if (data.adb_connected) {
+                        adbDot.classList.add('connected');
+                        adbStatus.textContent = '{{ t("adb_connected") }}';
                     } else {
-                        indicator.classList.add('stopped');
-                        statusText.textContent = translations.stopped;
+                        adbDot.classList.remove('connected');
+                        adbStatus.textContent = '{{ t("adb_disconnected") }}';
                     }
                     
                     // Letzte Aktion
-                    lastAction.textContent = data.last_action || translations.no_action;
+                    document.getElementById('lastAction').textContent = data.last_action || '-';
                     
-                    // ADB-Status
-                    adbStatus.className = 'connection-status';
-                    if (data.adb_connected) {
-                        adbStatus.classList.add('connected');
-                        adbStatus.textContent = translations.adb_connected;
-                    } else {
-                        adbStatus.classList.add('disconnected');
-                        adbStatus.textContent = translations.adb_disconnected;
-                    }
+                    // Aktueller Benutzer
+                    const userText = data.current_user ? `Benutzer: ${data.current_user}` : 'Kein aktiver Benutzer';
+                    document.getElementById('currentUser').textContent = userText;
                     
                     // Statistiken
                     document.getElementById('trucksProcessed').textContent = data.trucks_processed;
                     document.getElementById('trucksShared').textContent = data.trucks_shared;
                     document.getElementById('trucksSkipped').textContent = data.trucks_skipped;
-                })
-                .catch(error => console.error('Error updating status:', error));
+                    
+                    // Maintenance-Mode
+                    const maintenanceAlert = document.getElementById('maintenanceAlert');
+                    if (data.maintenance_mode) {
+                        maintenanceAlert.style.display = 'block';
+                    } else {
+                        maintenanceAlert.style.display = 'none';
+                    }
+                    
+                    // Timer-Info
+                    const timerInfo = document.getElementById('timerInfo');
+                    const timerValue = document.getElementById('timerValue');
+                    if (data.use_timer && data.timer_remaining) {
+                        timerInfo.style.display = 'block';
+                        timerValue.textContent = data.timer_remaining;
+                    } else {
+                        timerInfo.style.display = 'none';
+                    }
+                    
+                    // Button-Status
+                    updateButtons(data);
+                });
         }
         
+        function updateButtons(data) {
+            const btnStart = document.getElementById('btnStart');
+            const btnPause = document.getElementById('btnPause');
+            const btnStop = document.getElementById('btnStop');
+            
+            const isMyBot = data.current_user === '{{ user.username }}' || !data.current_user || '{{ user.role }}' === 'admin';
+            
+            if (data.running) {
+                btnStart.disabled = true;
+                btnPause.disabled = !isMyBot;
+                btnStop.disabled = !isMyBot;
+                
+                if (data.paused) {
+                    btnPause.innerHTML = '▶️ {{ t("btn_pause") }}';
+                } else {
+                    btnPause.innerHTML = '⏸️ {{ t("btn_pause") }}';
+                }
+            } else {
+                btnStart.disabled = data.current_user && data.current_user !== '{{ user.username }}' && '{{ user.role }}' !== 'admin';
+                btnPause.disabled = true;
+                btnStop.disabled = true;
+            }
+        }
+        
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type} show`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+        
+        function startBot() {
+            fetch('/api/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showAlert(data.error, 'error');
+                    } else {
+                        updateStatus();
+                    }
+                });
+        }
+        
+        function pauseBot() {
+            fetch('/api/pause', { method: 'POST' })
+                .then(response => response.json())
+                .then(() => updateStatus());
+        }
+        
+        function stopBot() {
+            fetch('/api/stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(() => updateStatus());
+        }
+        
+        function resetStats() {
+            if (confirm('{{ t("confirm_reset") }}')) {
+                fetch('/api/reset_stats', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(() => {
+                        updateStatus();
+                        showAlert('Statistiken zurückgesetzt', 'success');
+                    });
+            }
+        }
+        
+        function requestModeChange() {
+            const currentMode = document.getElementById('shareMode').value;
+            const newMode = currentMode === 'world' ? 'alliance' : 'world';
+            
+            if (confirm(`Möchten Sie den Modus zu "${newMode}" wechseln?`)) {
+                fetch('/api/request_mode_change', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requested_mode: newMode })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('{{ t("mode_change_requested") }}', 'success');
+                        loadSettings();
+                    }
+                });
+            }
+        }
+        
+        // Settings laden
         function loadSettings() {
             fetch('/api/settings')
                 .then(response => response.json())
@@ -546,100 +702,77 @@
                     document.getElementById('useServerFilter').checked = data.use_server_filter;
                     document.getElementById('serverNumber').value = data.server_number;
                     document.getElementById('resetInterval').value = data.reset_interval;
+                    document.getElementById('shareMode').value = data.share_mode;
+                    document.getElementById('useTimer').checked = data.use_timer;
+                    document.getElementById('timerDuration').value = data.timer_duration;
                     
-                    // Share-Modus setzen
-                    const shareMode = data.share_mode || 'world';
-                    document.querySelector(`input[name="shareMode"][value="${shareMode}"]`).checked = true;
+                    // Share-Mode Einschränkungen
+                    const shareMode = document.getElementById('shareMode');
+                    const modeRequestContainer = document.getElementById('modeRequestContainer');
+                    const modeRequestStatus = document.getElementById('modeRequestStatus');
                     
-                    // Prüfe ob User Share-Mode wählen darf
-                    const canChoose = data.can_choose_share_mode !== false;
-                    const radioButtons = document.querySelectorAll('input[name="shareMode"]');
-                    radioButtons.forEach(radio => {
-                        radio.disabled = !canChoose;
-                    });
-                    
-                    // Zeige Info wenn disabled
-                    if (!canChoose) {
-                        const modeText = data.forced_share_mode === 'alliance' ? '{{ t("share_alliance") }}' : '{{ t("share_world") }}';
-                        document.querySelector('.radio-group').insertAdjacentHTML('afterend', 
-                            `<small style="color: #6c757d; margin-top: 10px; display: block;">Admin hat ${modeText} festgelegt</small>`
-                        );
+                    if (!data.can_choose_share_mode) {
+                        shareMode.disabled = true;
+                        modeRequestContainer.style.display = 'block';
+                        
+                        if (data.forced_share_mode) {
+                            shareMode.value = data.forced_share_mode;
+                        }
+                        
+                        // Status der Anfrage anzeigen
+                        if (data.mode_change_request === 'pending') {
+                            modeRequestStatus.innerHTML = '<div class="mode-request-info">📨 Anfrage ausstehend für: ' + data.requested_mode + '</div>';
+                        } else if (data.mode_change_request === 'approved') {
+                            modeRequestStatus.innerHTML = '<div class="alert success">✅ Anfrage genehmigt</div>';
+                        } else if (data.mode_change_request === 'rejected') {
+                            modeRequestStatus.innerHTML = '<div class="alert error">❌ Anfrage abgelehnt</div>';
+                        }
+                    } else {
+                        shareMode.disabled = false;
+                        modeRequestContainer.style.display = 'none';
                     }
-                })
-                .catch(error => console.error('Error loading settings:', error));
+                });
         }
         
-        function saveSettings() {
-            // Share-Modus auslesen
-            const shareMode = document.querySelector('input[name="shareMode"]:checked').value;
+        // Settings speichern
+        document.getElementById('settingsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            const settings = {
+            const formData = {
                 use_limit: document.getElementById('useLimit').checked,
                 strength_limit: document.getElementById('strengthLimit').value,
                 use_server_filter: document.getElementById('useServerFilter').checked,
                 server_number: document.getElementById('serverNumber').value,
                 reset_interval: document.getElementById('resetInterval').value,
-                share_mode: shareMode
+                share_mode: document.getElementById('shareMode').value,
+                use_timer: document.getElementById('useTimer').checked,
+                timer_duration: document.getElementById('timerDuration').value
             };
             
             fetch('/api/settings', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(settings)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
             })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        alert(data.error || 'Fehler beim Speichern');
-                        throw new Error(data.error);
-                    });
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    alert(translations.settings_saved);
+                if (data.error) {
+                    showAlert(data.error, 'error');
+                } else {
+                    showAlert('{{ t("settings_saved") }}', 'success');
                 }
-            })
-            .catch(error => console.error('Error saving settings:', error));
-        }
+            });
+        });
         
-        function startBot() {
-            fetch('/api/start', { method: 'POST' })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(data => {
-                            alert(data.error || 'Fehler beim Starten');
-                            throw new Error(data.error);
-                        });
-                    }
-                    return response.json();
-                })
-                .then(() => updateStatus())
-                .catch(error => console.error('Error starting bot:', error));
-        }
+        // Auto-Update
+        updateStatus();
+        loadSettings();
+        updateInterval = setInterval(updateStatus, 2000);
         
-        function pauseBot() {
-            fetch('/api/pause', { method: 'POST' })
-                .then(() => updateStatus())
-                .catch(error => console.error('Error pausing bot:', error));
-        }
-        
-        function stopBot() {
-            fetch('/api/stop', { method: 'POST' })
-                .then(() => updateStatus())
-                .catch(error => console.error('Error stopping bot:', error));
-        }
-        
-        function resetStats() {
-            if (confirm(translations.confirm_reset)) {
-                fetch('/api/reset_stats', { method: 'POST' })
-                    .then(() => updateStatus())
-                    .catch(error => console.error('Error resetting stats:', error));
-            }
-        }
+        // Cleanup bei Verlassen
+        window.addEventListener('beforeunload', () => {
+            clearInterval(updateInterval);
+        });
     </script>
 </body>
 </html>

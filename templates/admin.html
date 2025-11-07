@@ -163,6 +163,21 @@
             color: white;
         }
         
+        .badge-pending {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .badge-approved {
+            background: #28a745;
+            color: white;
+        }
+        
+        .badge-rejected {
+            background: #dc3545;
+            color: white;
+        }
+        
         .action-btns {
             display: flex;
             gap: 5px;
@@ -199,22 +214,15 @@
             overflow-y: auto;
         }
         
-        .log-entry {
-            padding: 10px;
-            border-left: 3px solid #667eea;
-            background: #f8f9fa;
-            margin-bottom: 10px;
-            border-radius: 5px;
+        .audit-entry {
+            padding: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
         }
         
-        .log-entry .timestamp {
-            font-size: 12px;
+        .timestamp {
             color: #6c757d;
-        }
-        
-        .log-entry .user {
-            font-weight: 600;
-            color: #667eea;
+            font-size: 11px;
         }
         
         .modal {
@@ -230,31 +238,88 @@
         
         .modal-content {
             background: white;
-            margin: 10% auto;
+            margin: 15% auto;
             padding: 30px;
             border-radius: 15px;
-            width: 90%;
+            width: 80%;
             max-width: 500px;
         }
         
-        .modal-header {
-            margin-bottom: 20px;
-        }
-        
-        .modal-header h3 {
-            color: #667eea;
-        }
-        
         .close {
+            color: #aaa;
             float: right;
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
-            color: #aaa;
         }
         
         .close:hover {
             color: #000;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .request-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .request-info {
+            font-size: 14px;
+            color: #495057;
         }
     </style>
 </head>
@@ -262,129 +327,125 @@
     <div class="container">
         <div class="header">
             <div>
-                <h1>🛡️ Admin Dashboard</h1>
-                <p style="color: #6c757d; margin-top: 5px;">Benutzerverwaltung & Audit-Log</p>
+                <h1>👨‍💼 Admin Dashboard</h1>
+                <small style="color: #6c757d;">LKW-Bot Verwaltung</small>
             </div>
             <div class="header-actions">
-                <a href="/" class="btn btn-secondary">← Zurück zum Bot</a>
-                <a href="/logout" class="btn btn-danger">Abmelden</a>
+                <button class="btn btn-primary" onclick="location.href='/stats'">📊 Statistiken</button>
+                <button class="btn btn-secondary" onclick="location.href='/'">← Zurück</button>
+                <button class="btn btn-danger" onclick="location.href='/logout'">Abmelden</button>
             </div>
         </div>
         
         <div class="dashboard-grid">
-            <!-- Wartungsmodus -->
-            <div class="card">
-                <h2>🛠️ Wartungsmodus</h2>
-                <p style="margin-bottom: 15px; color: #6c757d;">Aktiviere den Wartungsmodus um normale User auszusperren.</p>
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <label style="font-weight: 600;">Status:</label>
-                    <span id="maintenanceStatus" class="badge badge-active">Inaktiv</span>
-                    <button id="maintenanceToggle" class="btn btn-warning" onclick="toggleMaintenance()">Aktivieren</button>
-                </div>
-            </div>
-            
-            <!-- Statistiken Link -->
-            <div class="card">
-                <h2>📊 Statistiken</h2>
-                <p style="margin-bottom: 15px; color: #6c757d;">Detaillierte Truck-Statistiken ansehen.</p>
-                <a href="/admin/stats" class="btn btn-primary">📈 Statistiken öffnen</a>
-            </div>
-            
-            <!-- Benutzerverwaltung -->
             <div class="card">
                 <h2>👥 Benutzerverwaltung</h2>
-                <button class="btn btn-success" onclick="showAddUserModal()" style="margin-bottom: 15px;">+ Benutzer hinzufügen</button>
-                
                 <table id="usersTable">
                     <thead>
                         <tr>
-                            <th>Benutzername</th>
+                            <th>Benutzer</th>
                             <th>Rolle</th>
                             <th>Status</th>
+                            <th>Share-Mode</th>
                             <th>Aktionen</th>
                         </tr>
                     </thead>
-                    <tbody id="usersTableBody">
-                        <tr><td colspan="4">Lade...</td></tr>
+                    <tbody>
+                        <!-- Wird per JS gefüllt -->
                     </tbody>
                 </table>
+                <button class="btn btn-primary" style="margin-top: 15px;" onclick="openAddUserModal()">➕ Benutzer hinzufügen</button>
             </div>
             
-            <!-- Audit Log -->
             <div class="card">
-                <h2>📋 Audit-Log (Letzte Aktionen)</h2>
-                <div class="audit-log" id="auditLog">
-                    <p>Lade...</p>
+                <h2>🔄 Modus-Wechsel-Anfragen</h2>
+                <div id="modeRequests">
+                    <!-- Wird per JS gefüllt -->
                 </div>
             </div>
         </div>
+        
+        <div class="card">
+            <h2>🛠️ System-Steuerung</h2>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div>
+                    <label class="switch">
+                        <input type="checkbox" id="maintenanceToggle" onchange="toggleMaintenance()">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="margin-left: 10px;">Maintenance-Mode</span>
+                </div>
+                <button class="btn btn-warning" onclick="clearLogs()">🗑️ Logs löschen</button>
+                <button class="btn btn-danger" onclick="resetAllStats()">⚠️ Alle Stats zurücksetzen</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📋 Audit-Log</h2>
+            <div class="audit-log" id="auditLog">
+                <!-- Wird per JS gefüllt -->
+            </div>
+        </div>
     </div>
     
-    <!-- Add User Modal -->
+    <!-- Modal für Benutzer hinzufügen -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span class="close" onclick="closeAddUserModal()">&times;</span>
-                <h3>Neuen Benutzer hinzufügen</h3>
-            </div>
-            <div class="form-group">
-                <label>Benutzername</label>
-                <input type="text" id="newUsername" placeholder="Benutzername">
-            </div>
-            <div class="form-group">
-                <label>Passwort</label>
-                <input type="password" id="newPassword" placeholder="Passwort">
-            </div>
-            <div class="form-group">
-                <label>Rolle</label>
-                <select id="newRole">
-                    <option value="user">Benutzer</option>
-                    <option value="admin">Admin</option>
-                </select>
-            </div>
-            <button class="btn btn-success" onclick="addUser()">Hinzufügen</button>
+            <span class="close" onclick="closeAddUserModal()">&times;</span>
+            <h2>Neuer Benutzer</h2>
+            <form id="addUserForm" onsubmit="addUser(event)">
+                <div class="form-group">
+                    <label>Benutzername</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Passwort</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>Rolle</label>
+                    <select name="role" required>
+                        <option value="user">Benutzer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Share-Mode Berechtigung</label>
+                    <select name="share_permission">
+                        <option value="choose">Kann wählen</option>
+                        <option value="world">Nur Weltchat</option>
+                        <option value="alliance">Nur A4O</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Hinzufügen</button>
+            </form>
         </div>
     </div>
     
-    <!-- Change Password Modal -->
-    <div id="changePasswordModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="close" onclick="closeChangePasswordModal()">&times;</span>
-                <h3>Passwort ändern</h3>
-            </div>
-            <input type="hidden" id="changePasswordUsername">
-            <div class="form-group">
-                <label>Neues Passwort</label>
-                <input type="password" id="changePassword" placeholder="Neues Passwort">
-            </div>
-            <button class="btn btn-primary" onclick="changePassword()">Passwort ändern</button>
-        </div>
-    </div>
-    
-    <!-- Share Mode Modal -->
+    <!-- Modal für Share-Mode ändern -->
     <div id="shareModeModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span class="close" onclick="closeShareModeModal()">&times;</span>
-                <h3>Share-Modus Einstellungen</h3>
-            </div>
-            <input type="hidden" id="shareModeUsername">
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="canChooseShareMode" checked>
-                    User darf Share-Modus wählen
-                </label>
-            </div>
-            <div class="form-group" id="forcedModeGroup">
-                <label>Erzwungener Modus (wenn User nicht wählen darf)</label>
-                <select id="forcedShareMode">
-                    <option value="">Keiner</option>
-                    <option value="world">Weltchat</option>
-                    <option value="alliance">A4O</option>
-                </select>
-            </div>
-            <button class="btn btn-primary" onclick="saveShareMode()">Speichern</button>
+            <span class="close" onclick="closeShareModeModal()">&times;</span>
+            <h2>Share-Mode Einstellungen</h2>
+            <form id="shareModeForm" onsubmit="updateShareMode(event)">
+                <input type="hidden" id="modalUsername">
+                <div class="form-group">
+                    <label>Benutzer darf Share-Mode wählen</label>
+                    <select id="modalCanChoose" onchange="toggleForcedMode()">
+                        <option value="true">Ja</option>
+                        <option value="false">Nein</option>
+                    </select>
+                </div>
+                <div class="form-group" id="forcedModeGroup">
+                    <label>Erzwungener Modus</label>
+                    <select id="modalForcedMode">
+                        <option value="">Keiner</option>
+                        <option value="world">Weltchat</option>
+                        <option value="alliance">A4O</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </form>
         </div>
     </div>
     
@@ -394,92 +455,147 @@
             fetch('/api/admin/users')
                 .then(response => response.json())
                 .then(data => {
-                    const tbody = document.getElementById('usersTableBody');
+                    const tbody = document.querySelector('#usersTable tbody');
                     tbody.innerHTML = '';
                     
                     data.users.forEach(user => {
-                        const tr = document.createElement('tr');
+                        const row = tbody.insertRow();
                         
-                        const roleBadge = user.role === 'admin' ? 
-                            '<span class="badge badge-admin">Admin</span>' : 
-                            '<span class="badge badge-user">Benutzer</span>';
+                        // Benutzername
+                        row.insertCell(0).innerHTML = `<strong>${user.username}</strong>`;
                         
-                        const statusBadge = user.blocked ? 
-                            '<span class="badge badge-blocked">Gesperrt</span>' : 
-                            '<span class="badge badge-active">Aktiv</span>';
+                        // Rolle
+                        const roleCell = row.insertCell(1);
+                        const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-user';
+                        roleCell.innerHTML = `<span class="badge ${roleBadge}">${user.role}</span>`;
                         
-                        let actions = '<div class="action-btns">';
+                        // Status
+                        const statusCell = row.insertCell(2);
+                        const statusBadge = user.blocked ? 'badge-blocked' : 'badge-active';
+                        const statusText = user.blocked ? 'Gesperrt' : 'Aktiv';
+                        statusCell.innerHTML = `<span class="badge ${statusBadge}">${statusText}</span>`;
                         
-                        if (user.username !== 'admin') {
-                            if (user.blocked) {
-                                actions += `<button class="btn btn-success" onclick="unblockUser('${user.username}')">Entsperren</button>`;
-                            } else {
-                                actions += `<button class="btn btn-warning" onclick="blockUser('${user.username}')">Sperren</button>`;
-                            }
-                            actions += `<button class="btn btn-primary" onclick="showShareModeModal('${user.username}')">Share-Modus</button>`;
-                            actions += `<button class="btn btn-primary" onclick="showChangePasswordModal('${user.username}')">Passwort</button>`;
-                            actions += `<button class="btn btn-danger" onclick="deleteUser('${user.username}')">Löschen</button>`;
+                        // Share-Mode
+                        const modeCell = row.insertCell(3);
+                        if (user.can_choose_share_mode) {
+                            modeCell.innerHTML = '<span class="badge badge-active">Frei wählbar</span>';
+                        } else if (user.forced_share_mode) {
+                            modeCell.innerHTML = `<span class="badge badge-warning">${user.forced_share_mode}</span>`;
                         } else {
-                            actions += '<span style="color: #6c757d;">Admin (geschützt)</span>';
+                            modeCell.innerHTML = '<span class="badge badge-user">Standard</span>';
                         }
                         
-                        actions += '</div>';
+                        // Aktionen
+                        const actionsCell = row.insertCell(4);
+                        actionsCell.innerHTML = `
+                            <div class="action-btns">
+                                <button class="btn btn-warning" onclick="toggleBlock('${user.username}')">
+                                    ${user.blocked ? '🔓 Entsperren' : '🔒 Sperren'}
+                                </button>
+                                <button class="btn btn-primary" onclick="openShareModeModal('${user.username}', ${user.can_choose_share_mode}, '${user.forced_share_mode || ''}')">
+                                    ⚙️ Share-Mode
+                                </button>
+                                <button class="btn btn-danger" onclick="resetPassword('${user.username}')">
+                                    🔑 Passwort
+                                </button>
+                            </div>
+                        `;
+                    });
+                });
+        }
+        
+        // Lade Modus-Wechsel-Anfragen
+        function loadModeRequests() {
+            fetch('/api/admin/mode_requests')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('modeRequests');
+                    container.innerHTML = '';
+                    
+                    const requests = Object.entries(data.requests).filter(([user, req]) => req.status === 'pending');
+                    
+                    if (requests.length === 0) {
+                        container.innerHTML = '<p style="color: #6c757d;">Keine ausstehenden Anfragen</p>';
+                        return;
+                    }
+                    
+                    requests.forEach(([username, request]) => {
+                        const requestCard = document.createElement('div');
+                        requestCard.className = 'request-card';
                         
-                        tr.innerHTML = `
-                            <td><strong>${user.username}</strong></td>
-                            <td>${roleBadge}</td>
-                            <td>${statusBadge}</td>
-                            <td>${actions}</td>
+                        const timestamp = new Date(request.timestamp).toLocaleString('de-DE');
+                        
+                        requestCard.innerHTML = `
+                            <div class="request-header">
+                                <div>
+                                    <strong>${username}</strong>
+                                    <div class="request-info">
+                                        Möchte zu <span class="badge badge-warning">${request.requested_mode}</span> wechseln
+                                    </div>
+                                    <div class="timestamp">${timestamp}</div>
+                                </div>
+                                <div class="action-btns">
+                                    <button class="btn btn-success" onclick="approveRequest('${username}')">
+                                        ✅ Genehmigen
+                                    </button>
+                                    <button class="btn btn-danger" onclick="rejectRequest('${username}')">
+                                        ❌ Ablehnen
+                                    </button>
+                                </div>
+                            </div>
                         `;
                         
-                        tbody.appendChild(tr);
+                        container.appendChild(requestCard);
                     });
-                })
-                .catch(error => console.error('Error:', error));
+                });
+        }
+        
+        // Modus-Anfrage genehmigen
+        function approveRequest(username) {
+            fetch(`/api/admin/approve_mode_change/${username}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(() => {
+                    loadModeRequests();
+                    loadUsers();
+                    showAlert('Anfrage genehmigt', 'success');
+                });
+        }
+        
+        // Modus-Anfrage ablehnen
+        function rejectRequest(username) {
+            fetch(`/api/admin/reject_mode_change/${username}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(() => {
+                    loadModeRequests();
+                    showAlert('Anfrage abgelehnt', 'warning');
+                });
         }
         
         // Lade Audit-Log
         function loadAuditLog() {
-            fetch('/api/admin/audit')
+            fetch('/api/admin/audit_log')
                 .then(response => response.json())
                 .then(data => {
-                    const auditLog = document.getElementById('auditLog');
-                    auditLog.innerHTML = '';
+                    const container = document.getElementById('auditLog');
+                    container.innerHTML = '';
                     
-                    if (data.logs.length === 0) {
-                        auditLog.innerHTML = '<p>Keine Einträge</p>';
-                        return;
-                    }
-                    
-                    data.logs.reverse().forEach(log => {
-                        const entry = document.createElement('div');
-                        entry.className = 'log-entry';
-                        entry.innerHTML = `
-                            <div class="timestamp">${log.timestamp}</div>
-                            <div><span class="user">${log.username}</span> → ${log.action}</div>
-                            ${log.details ? `<div style="font-size: 12px; color: #6c757d;">${log.details}</div>` : ''}
+                    // Neueste zuerst
+                    data.logs.reverse().forEach(entry => {
+                        const div = document.createElement('div');
+                        div.className = 'audit-entry';
+                        div.innerHTML = `
+                            <strong>${entry.username}</strong> - ${entry.action}
+                            ${entry.details ? `<br><small>${entry.details}</small>` : ''}
+                            <div class="timestamp">${entry.timestamp}</div>
                         `;
-                        auditLog.appendChild(entry);
+                        container.appendChild(div);
                     });
-                })
-                .catch(error => console.error('Error:', error));
+                });
         }
         
-        // Benutzer sperren
-        function blockUser(username) {
-            if (confirm(`Benutzer "${username}" wirklich sperren?`)) {
-                fetch(`/api/admin/users/${username}/block`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(() => {
-                        loadUsers();
-                        loadAuditLog();
-                    });
-            }
-        }
-        
-        // Benutzer entsperren
-        function unblockUser(username) {
-            fetch(`/api/admin/users/${username}/unblock`, { method: 'POST' })
+        // Benutzer sperren/entsperren
+        function toggleBlock(username) {
+            fetch(`/api/admin/user/toggle_block/${username}`, { method: 'POST' })
                 .then(response => response.json())
                 .then(() => {
                     loadUsers();
@@ -487,94 +603,12 @@
                 });
         }
         
-        // Benutzer löschen
-        function deleteUser(username) {
-            if (confirm(`Benutzer "${username}" wirklich löschen?`)) {
-                fetch(`/api/admin/users/${username}`, { method: 'DELETE' })
-                    .then(response => response.json())
-                    .then(() => {
-                        loadUsers();
-                        loadAuditLog();
-                    });
-            }
-        }
-        
-        // Benutzer hinzufügen Modal
-        function showAddUserModal() {
-            document.getElementById('addUserModal').style.display = 'block';
-        }
-        
-        function closeAddUserModal() {
-            document.getElementById('addUserModal').style.display = 'none';
-        }
-        
-        function addUser() {
-            const username = document.getElementById('newUsername').value;
-            const password = document.getElementById('newPassword').value;
-            const role = document.getElementById('newRole').value;
-            
-            if (!username || !password) {
-                alert('Bitte alle Felder ausfüllen!');
-                return;
-            }
-            
-            fetch('/api/admin/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, role })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    closeAddUserModal();
-                    loadUsers();
-                    loadAuditLog();
-                    document.getElementById('newUsername').value = '';
-                    document.getElementById('newPassword').value = '';
-                } else {
-                    alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
-                }
-            });
-        }
-        
-        // Passwort ändern Modal
-        function showChangePasswordModal(username) {
-            document.getElementById('changePasswordUsername').value = username;
-            document.getElementById('changePasswordModal').style.display = 'block';
-        }
-        
-        function closeChangePasswordModal() {
-            document.getElementById('changePasswordModal').style.display = 'none';
-        }
-        
-        function changePassword() {
-            const username = document.getElementById('changePasswordUsername').value;
-            const password = document.getElementById('changePassword').value;
-            
-            if (!password) {
-                alert('Bitte Passwort eingeben!');
-                return;
-            }
-            
-            fetch(`/api/admin/users/${username}/password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    closeChangePasswordModal();
-                    loadAuditLog();
-                    document.getElementById('changePassword').value = '';
-                    alert('Passwort erfolgreich geändert!');
-                }
-            });
-        }
-        
-        // Share-Mode Modal
-        function showShareModeModal(username) {
-            document.getElementById('shareModeUsername').value = username;
+        // Share-Mode Modal öffnen
+        function openShareModeModal(username, canChoose, forcedMode) {
+            document.getElementById('modalUsername').value = username;
+            document.getElementById('modalCanChoose').value = canChoose.toString();
+            document.getElementById('modalForcedMode').value = forcedMode;
+            toggleForcedMode();
             document.getElementById('shareModeModal').style.display = 'block';
         }
         
@@ -582,82 +616,127 @@
             document.getElementById('shareModeModal').style.display = 'none';
         }
         
-        function saveShareMode() {
-            const username = document.getElementById('shareModeUsername').value;
-            const canChoose = document.getElementById('canChooseShareMode').checked;
-            const forcedMode = document.getElementById('forcedShareMode').value || null;
+        function toggleForcedMode() {
+            const canChoose = document.getElementById('modalCanChoose').value === 'true';
+            document.getElementById('forcedModeGroup').style.display = canChoose ? 'none' : 'block';
+        }
+        
+        function updateShareMode(event) {
+            event.preventDefault();
+            const username = document.getElementById('modalUsername').value;
+            const canChoose = document.getElementById('modalCanChoose').value === 'true';
+            const forcedMode = canChoose ? null : document.getElementById('modalForcedMode').value;
             
-            fetch(`/api/admin/users/${username}/share_mode`, {
+            fetch(`/api/admin/user/set_share_mode/${username}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ can_choose: canChoose, forced_mode: forcedMode })
+                body: JSON.stringify({
+                    can_choose: canChoose,
+                    forced_mode: forcedMode
+                })
             })
             .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    closeShareModeModal();
-                    loadAuditLog();
-                    alert('Share-Modus gespeichert!');
-                }
+            .then(() => {
+                closeShareModeModal();
+                loadUsers();
+                loadAuditLog();
+                showAlert('Share-Mode aktualisiert', 'success');
             });
         }
         
-        // Wartungsmodus
-        function loadMaintenanceStatus() {
-            fetch('/api/admin/maintenance')
-                .then(response => response.json())
-                .then(data => {
-                    const status = document.getElementById('maintenanceStatus');
-                    const button = document.getElementById('maintenanceToggle');
-                    
-                    if (data.enabled) {
-                        status.textContent = 'Aktiv';
-                        status.className = 'badge badge-blocked';
-                        button.textContent = 'Deaktivieren';
-                        button.className = 'btn btn-success';
-                    } else {
-                        status.textContent = 'Inaktiv';
-                        status.className = 'badge badge-active';
-                        button.textContent = 'Aktivieren';
-                        button.className = 'btn btn-warning';
-                    }
-                });
+        // Benutzer hinzufügen Modal
+        function openAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'block';
         }
         
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'none';
+            document.getElementById('addUserForm').reset();
+        }
+        
+        function addUser(event) {
+            event.preventDefault();
+            // Diese Funktion müsste im Backend implementiert werden
+            alert('Benutzer hinzufügen - Backend-Implementation erforderlich');
+            closeAddUserModal();
+        }
+        
+        // Passwort zurücksetzen
+        function resetPassword(username) {
+            const newPassword = prompt(`Neues Passwort für ${username}:`);
+            if (newPassword) {
+                // Diese Funktion müsste im Backend implementiert werden
+                alert('Passwort-Reset - Backend-Implementation erforderlich');
+            }
+        }
+        
+        // Maintenance-Mode
         function toggleMaintenance() {
-            fetch('/api/admin/maintenance')
-                .then(response => response.json())
-                .then(data => {
-                    const newState = !data.enabled;
-                    
-                    return fetch('/api/admin/maintenance', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ enabled: newState })
-                    });
-                })
-                .then(() => {
-                    loadMaintenanceStatus();
-                    loadAuditLog();
-                });
+            const enabled = document.getElementById('maintenanceToggle').checked;
+            fetch('/api/admin/maintenance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled })
+            })
+            .then(response => response.json())
+            .then(() => {
+                showAlert(enabled ? 'Maintenance-Mode aktiviert' : 'Maintenance-Mode deaktiviert', 'warning');
+            });
         }
         
-        // Checkbox Toggle für Share-Mode
-        document.getElementById('canChooseShareMode').addEventListener('change', function() {
-            document.getElementById('forcedModeGroup').style.display = this.checked ? 'none' : 'block';
-        });
+        // Logs löschen
+        function clearLogs() {
+            if (confirm('Wirklich alle Logs löschen?')) {
+                // Diese Funktion müsste im Backend implementiert werden
+                alert('Log-Löschung - Backend-Implementation erforderlich');
+            }
+        }
+        
+        // Alle Stats zurücksetzen
+        function resetAllStats() {
+            if (confirm('WARNUNG: Wirklich ALLE Statistiken löschen? Dies kann nicht rückgängig gemacht werden!')) {
+                // Diese Funktion müsste im Backend implementiert werden
+                alert('Stats-Reset - Backend-Implementation erforderlich');
+            }
+        }
+        
+        // Alert anzeigen
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+                color: ${type === 'warning' ? '#000' : '#fff'};
+                border-radius: 8px;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            alert.textContent = message;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => alert.remove(), 3000);
+        }
         
         // Initial laden
         loadUsers();
+        loadModeRequests();
         loadAuditLog();
-        loadMaintenanceStatus();
         
-        // Auto-refresh alle 5 Sekunden
+        // Auto-Refresh alle 5 Sekunden
         setInterval(() => {
-            loadUsers();
+            loadModeRequests();
             loadAuditLog();
-            loadMaintenanceStatus();
         }, 5000);
+        
+        // Modal schließen bei Klick außerhalb
+        window.onclick = function(event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>
