@@ -3,6 +3,7 @@
 """
 LKW-Bot für Last War mit Web-Interface
 Optimiert für Raspberry Pi und VMOSCloud über SSH-Tunnel
+Version 2.0 - Mit Timer-Feature und verbessertem Share-Mode-Management
 """
 
 import subprocess
@@ -64,7 +65,12 @@ TRANSLATIONS = {
         'settings_saved': 'Einstellungen gespeichert!',
         'confirm_reset': 'Statistiken wirklich zurücksetzen?',
         'language': 'Sprache',
-        'admin_dashboard': 'Admin'
+        'admin_dashboard': 'Admin',
+        'use_timer': 'Timer verwenden',
+        'timer_minutes': 'Laufzeit (Minuten)',
+        'timer_remaining': 'Verbleibende Zeit',
+        'request_mode_change': 'Modus-Wechsel anfordern',
+        'mode_change_requested': 'Modus-Wechsel angefordert'
     },
     'en': {
         'app_title': 'Truck Bot Control',
@@ -106,97 +112,73 @@ TRANSLATIONS = {
         'settings_saved': 'Settings saved!',
         'confirm_reset': 'Really reset statistics?',
         'language': 'Language',
-        'admin_dashboard': 'Admin'
+        'admin_dashboard': 'Admin',
+        'use_timer': 'Use timer',
+        'timer_minutes': 'Runtime (minutes)',
+        'timer_remaining': 'Time remaining',
+        'request_mode_change': 'Request mode change',
+        'mode_change_requested': 'Mode change requested'
     }
 }
 
-# Konfiguration
-TEMPLATE_PATH = 'rentier_template.png'
-STAERKENFILE = "lkw_staerken.txt"
-TRUCK_DATA_FILE = "truck_data.json"  # NEU: Detaillierte Truck-Daten
-MAINTENANCE_MODE_FILE = "maintenance_mode.json"  # NEU: Wartungsmodus
+# ================== SSH/ADB Konfiguration ==================
 
-# Koordinaten umgerechnet von 1600x900 auf 720x1280
-# Umrechnungsfaktor: x * 0.45, y * 1.422
-COORDS_OLD = {
-    'esc': (840, 100),
-    'share': (530, 1400),
-    'share_confirm1': (300, 550),
-    'share_confirm2': (520, 900),
-}
+# SSH-Verbindungsdaten zu VMOSCloud
+SSH_USER = 'socks'
+SSH_HOST = 'kp.vmoscloud.com'
+SSH_PORT = 26282
+SSH_KEY = '41dGo-'
 
-COORDS_NEW = {
-    'esc': (680, 70),             # ESC-Button oben rechts
-    'share': (450, 1100),         # Teilen-Button
-    'share_confirm1': (300, 450), # Bestätigung 1 - Weltchat
-    'share_confirm2': (400, 750), # Bestätigung 2 - Weltchat
-}
+# Lokaler Port für ADB-Tunnel
+LOCAL_ADB_PORT = 16789
+# ADB-Port auf VMOSCloud
+REMOTE_ADB = 'localhost:5555'
 
-# Koordinaten für Allianz-Chat (Alternative)
-COORDS_ALLIANCE = {
-    'esc': (680, 70),             # ESC-Button (gleich)
-    'share': (450, 1100),         # Teilen-Button (gleich)
-    'share_confirm1': (300, 700), # Bestätigung 1 - Allianz-Chat
-    'share_confirm2': (400, 750), # Bestätigung 2 - Allianz-Chat (gleich)
-}
+# ================== Flask Setup ==================
 
-# OCR-Boxen (links, oben, rechts, unten)
-STAERKE_BOX = (200, 950, 300, 1000)   # Stärke-Bereich
-SERVER_BOX = (160, 860, 220, 915)     # Server-Bereich
-
-# SSH-Tunnel Konfiguration für VMOSCloud
-SSH_HOST = "10.0.4.206_1762383884162@103.237.100.130"
-SSH_PORT = 1824
-SSH_KEY = "j0343aTw718AKRn2XP018+mmc8PkBtBdLN7Pqg7c/eWZ/ZjtMGLTwsdjqmDMsuqd8cDIZKC0oYm0P4eCVLjeAQ=="
-LOCAL_ADB_PORT = 9842
-REMOTE_ADB = "adb-proxy:46795"
-
-# Flask App Setup
 app = Flask(__name__)
-app.secret_key = 'dein-geheimer-schluessel-aendern!'  # WICHTIG: Ändern!
-
-# Flask App Setup
-app = Flask(__name__)
-app.secret_key = 'dein-geheimer-schluessel-aendern!'  # WICHTIG: Ändern!
+app.secret_key = 'dein-geheimer-schluessel-hier-ändern-123!@#'
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Logging
-logging.basicConfig(level=logging.INFO)
+# ================== Logging ==================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('lkw-bot.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
-# ================== User Management ==================
+# ================== Dateipfade ==================
 
-USERS_FILE = "users.json"
-AUDIT_LOG_FILE = "audit_log.json"
-STATS_FILE = "truck_stats.json"
-MAINTENANCE_FILE = "maintenance.json"
+TEMPLATE_FILE = 'rentier_template.png'
+STAERKEN_FILE = 'lkw_staerken.txt'
+USERS_FILE = 'users.json'
+AUDIT_LOG_FILE = 'audit_log.json'
+MAINTENANCE_FILE = 'maintenance.json'
+STATS_FILE = 'truck_stats.json'
+MODE_REQUESTS_FILE = 'mode_requests.json'
 
-class User:
-    def __init__(self, username, password_hash, role, blocked=False, can_choose_share_mode=True, forced_share_mode=None):
+# ================== User System ==================
+
+class User(UserMixin):
+    def __init__(self, username, password, role='user', blocked=False, can_choose_share_mode=True, forced_share_mode=None):
+        self.id = username
         self.username = username
-        self.password_hash = password_hash
-        self.role = role  # 'admin', 'user'
+        self.password = password
+        self.role = role
         self.blocked = blocked
-        self.can_choose_share_mode = can_choose_share_mode  # Darf User wählen?
-        self.forced_share_mode = forced_share_mode  # 'world', 'alliance' oder None
-    
-    def is_authenticated(self):
-        return True
-    
-    def is_active(self):
-        return not self.blocked
-    
-    def is_anonymous(self):
-        return False
-    
-    def get_id(self):
-        return self.username
+        self.can_choose_share_mode = can_choose_share_mode
+        self.forced_share_mode = forced_share_mode
 
 def init_users():
-    """Initialisiere User-Datenbank"""
+    """Initialisiere Benutzer-Datenbank"""
     if not os.path.exists(USERS_FILE):
         users = {
             'admin': {
@@ -295,6 +277,12 @@ class BotController:
         self.lock = threading.Lock()
         self.current_user = None
         
+        # Timer-Funktionen
+        self.use_timer = False
+        self.timer_duration_minutes = 60
+        self.timer_start_time = None
+        self.timer_thread = None
+        
         # Einstellungen
         self.use_limit = False
         self.strength_limit = 60.0
@@ -303,6 +291,9 @@ class BotController:
         self.reset_interval = 15
         self.share_mode = "world"
         self.adb_connected = False
+        
+        # Mode-Change-Requests
+        self.mode_change_requests = self.load_mode_change_requests()
         
         # Fehlerüberwachung
         self.last_success_time = time.time()
@@ -318,6 +309,74 @@ class BotController:
         self.maintenance_mode = self.load_maintenance_mode()
         self.last_success_time = time.time()  # Letzte erfolgreiche Aktion
         self.no_truck_threshold = 300  # 5 Minuten ohne Fund = Problem
+        
+    def load_mode_change_requests(self):
+        """Lade Mode-Change-Requests"""
+        if os.path.exists(MODE_REQUESTS_FILE):
+            with open(MODE_REQUESTS_FILE, 'r') as f:
+                return json.load(f)
+        return {}
+    
+    def save_mode_change_requests(self):
+        """Speichere Mode-Change-Requests"""
+        with open(MODE_REQUESTS_FILE, 'w') as f:
+            json.dump(self.mode_change_requests, f, indent=2)
+    
+    def request_mode_change(self, username, requested_mode):
+        """Fordere Modus-Wechsel an"""
+        self.mode_change_requests[username] = {
+            'requested_mode': requested_mode,
+            'timestamp': datetime.now().isoformat(),
+            'status': 'pending'
+        }
+        self.save_mode_change_requests()
+        logger.info(f"Mode change requested by {username}: {requested_mode}")
+        
+    def approve_mode_change(self, username):
+        """Genehmige Modus-Wechsel"""
+        if username in self.mode_change_requests:
+            req = self.mode_change_requests[username]
+            users = load_users()
+            if username in users:
+                users[username]['forced_share_mode'] = req['requested_mode']
+                users[username]['can_choose_share_mode'] = True
+                save_users(users)
+                req['status'] = 'approved'
+                self.save_mode_change_requests()
+                
+                # Wenn dieser User gerade den Bot nutzt, aktualisiere den Modus
+                if self.current_user == username:
+                    self.share_mode = req['requested_mode']
+                
+                return True
+        return False
+    
+    def reject_mode_change(self, username):
+        """Lehne Modus-Wechsel ab"""
+        if username in self.mode_change_requests:
+            self.mode_change_requests[username]['status'] = 'rejected'
+            self.save_mode_change_requests()
+            return True
+        return False
+    
+    def get_remaining_time_seconds(self):
+        """Gibt die verbleibende Zeit in Sekunden zurück"""
+        if not self.use_timer or not self.timer_start_time:
+            return None
+        
+        elapsed = time.time() - self.timer_start_time
+        remaining = (self.timer_duration_minutes * 60) - elapsed
+        return max(0, remaining)
+    
+    def check_timer(self):
+        """Überprüft den Timer und stoppt den Bot wenn Zeit abgelaufen"""
+        while self.running and self.use_timer:
+            remaining = self.get_remaining_time_seconds()
+            if remaining is not None and remaining <= 0:
+                logger.info(f"Timer abgelaufen - Bot wird gestoppt")
+                self.stop()
+                break
+            time.sleep(1)
         
     def load_maintenance_mode(self):
         """Lade Maintenance-Status"""
@@ -349,34 +408,37 @@ class BotController:
         if not os.path.exists(STATS_FILE):
             stats = []
         else:
-            with open(STATS_FILE, 'r') as f:
-                stats = json.load(f)
+            try:
+                with open(STATS_FILE, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        stats = json.loads(content)
+                    else:
+                        stats = []
+            except (json.JSONDecodeError, ValueError):
+                logger.error(f"Korrupte Stats-Datei, erstelle neue")
+                stats = []
         
-        from datetime import datetime
-        import pytz
+        # Deutsche Zeit für Timestamp
         tz = pytz.timezone('Europe/Berlin')
         timestamp = datetime.now(tz).isoformat()
         
         stats.append({
-            'timestamp': timestamp,
             'strength': strength,
             'server': server,
+            'timestamp': timestamp,
             'user': self.current_user
         })
         
-        # Nur letzte 30 Tage behalten
-        cutoff = datetime.now(tz) - timedelta(days=30)
-        stats = [s for s in stats if datetime.fromisoformat(s['timestamp']) > cutoff]
+        # Behalte nur letzte 1000 Einträge
+        stats = stats[-1000:]
         
-        with open(STATS_FILE, 'w') as f:
-            json.dump(stats, f, indent=2)
-        
-        # Erfolgreich → Reset Timer
-        self.last_success_time = time.time()
-        if self.maintenance_mode:
-            logger.info("LKW gefunden - deaktiviere Maintenance-Mode")
-            self.set_maintenance_mode(False)
-        
+        try:
+            with open(STATS_FILE, 'w') as f:
+                json.dump(stats, f, indent=2)
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern der Stats: {e}")
+    
     def setup_ssh_tunnel(self):
         """Erstellt SSH-Tunnel zu VMOSCloud"""
         try:
@@ -450,303 +512,228 @@ class BotController:
         """Klickt auf Koordinaten"""
         try:
             adb_device = f'localhost:{LOCAL_ADB_PORT}'
-            logger.info(f"Klicke auf ({x}, {y})")
-            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)], 
-                         timeout=5)
-            time.sleep(2)
+            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)])
             return True
         except Exception as e:
             logger.error(f"Klick-Fehler: {e}")
             return False
     
-    def ocr_staerke(self):
-        """Liest Stärke per OCR"""
+    def swipe(self, x1, y1, x2, y2, duration=500):
+        """Swipe-Geste"""
         try:
-            img = Image.open('info.png')
-            staerke_img = img.crop(STAERKE_BOX)
-            staerke_img.save('staerke_ocr.png')
-            
-            # OCR mit mehreren Konfigurationen versuchen
-            configs = [
-                '--psm 7',  # Single text line
-                '--psm 8',  # Single word
-                '--psm 6',  # Uniform block of text
-            ]
-            
-            for config in configs:
-                wert = pytesseract.image_to_string(staerke_img, lang='eng', config=config).strip()
-                if wert and ('m' in wert.lower() or 'M' in wert):
-                    logger.info(f"OCR Stärke: {wert}")
-                    return wert
-            
-            logger.warning("OCR konnte keine Stärke finden")
-            return ""
+            adb_device = f'localhost:{LOCAL_ADB_PORT}'
+            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'swipe', 
+                          str(x1), str(y1), str(x2), str(y2), str(duration)])
+            return True
         except Exception as e:
-            logger.error(f"OCR-Fehler: {e}")
-            return ""
-    
-    def ist_server_passend(self):
-        """Prüft ob Server passt"""
-        try:
-            img = Image.open('info.png')
-            server_img = img.crop(SERVER_BOX)
-            server_img.save('server_ocr.png')
-            server_text = pytesseract.image_to_string(server_img, lang='eng').strip()
-            logger.info(f"OCR Server: '{server_text}'")
-            
-            s_txt = server_text.replace(' ', '').replace('O', '0')
-            return (f"#{self.server_number}" in s_txt) or (self.server_number in s_txt)
-        except Exception as e:
-            logger.error(f"Server-Check-Fehler: {e}")
+            logger.error(f"Swipe-Fehler: {e}")
             return False
     
-    def rentier_lkw_finden(self):
-        """Findet Rentier-LKW per Template-Matching"""
-        try:
-            screenshot = cv2.imread('screen.png')
-            template = cv2.imread(TEMPLATE_PATH)
-            
-            if screenshot is None or template is None:
-                logger.error("Screenshot oder Template fehlt!")
-                return None
-            
-            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-            locations = np.where(result >= 0.40)
-            matches = [(int(pt[0]), int(pt[1])) for pt in zip(*locations[::-1])]
-            
-            return matches if matches else None
-        except Exception as e:
-            logger.error(f"Template-Matching-Fehler: {e}")
-            return None
+    def load_staerken(self):
+        """Lädt bereits geteilte Stärken"""
+        if os.path.exists(STAERKEN_FILE):
+            with open(STAERKEN_FILE, 'r') as f:
+                return f.read().splitlines()
+        return []
     
-    def staerke_float_wert(self, staerke_text):
-        """Extrahiert numerischen Wert aus Stärke-Text und korrigiert fehlendes Komma"""
-        match = re.search(r"([\d\.,]+)\s*[mM]", staerke_text)
-        if match:
-            try:
-                zahl_str = match.group(1).replace(',', '.')
-                zahl = float(zahl_str)
-                
-                # Automatische Komma-Korrektur:
-                # Wenn die Zahl >= 100 ist UND kein Komma/Punkt drin war
-                # dann wurde das Komma vom OCR übersehen
-                if zahl >= 100 and '.' not in match.group(1) and ',' not in match.group(1):
-                    # Füge Komma zwischen vorletzter und letzter Ziffer ein
-                    # 305 → 30.5, 793 → 79.3, 1234 → 123.4
-                    zahl = zahl / 10
-                    logger.info(f"Komma-Korrektur: {match.group(1)}M → {zahl}M")
-                
-                return zahl
-            except ValueError:
-                return None
-        return None
-    
-    def staerke_ist_bekannt(self, staerke):
-        """Prüft ob Stärke schon bekannt"""
-        if os.path.exists(STAERKENFILE):
-            with open(STAERKENFILE, encoding="utf-8") as f:
-                if staerke in (line.strip() for line in f):
-                    return True
-        return False
-    
-    def notiere_staerke(self, staerke):
-        """Notiert Stärke in Datei"""
-        with open(STAERKENFILE, "a", encoding="utf-8") as f:
-            f.write(staerke + "\n")
-        logger.info(f"Stärke {staerke} notiert")
-    
-    def save_truck_data(self, staerke, server):
-        """Speichert detaillierte Truck-Daten für Statistiken"""
-        try:
-            # Lade existierende Daten
-            if os.path.exists(TRUCK_DATA_FILE):
-                with open(TRUCK_DATA_FILE, 'r') as f:
-                    data = json.load(f)
-            else:
-                data = []
-            
-            # Deutsche Zeit
-            tz = pytz.timezone('Europe/Berlin')
-            timestamp = datetime.now(tz).isoformat()
-            
-            # Neuen Eintrag hinzufügen
-            data.append({
-                'timestamp': timestamp,
-                'strength': staerke,
-                'server': server,
-                'user': self.current_user
-            })
-            
-            # Alte Daten löschen (älter als 30 Tage)
-            cutoff = datetime.now(tz) - timedelta(days=30)
-            data = [d for d in data if datetime.fromisoformat(d['timestamp']) > cutoff]
-            
-            # Speichern
-            with open(TRUCK_DATA_FILE, 'w') as f:
-                json.dump(data, f, indent=2)
-                
-        except Exception as e:
-            logger.error(f"Fehler beim Speichern der Truck-Daten: {e}")
-    
-    def save_maintenance_mode(self, enabled):
-        """Speichert Wartungsmodus-Status"""
-        try:
-            with open(MAINTENANCE_MODE_FILE, 'w') as f:
-                json.dump({'enabled': enabled, 'timestamp': datetime.now().isoformat()}, f)
-        except Exception as e:
-            logger.error(f"Fehler beim Speichern des Wartungsmodus: {e}")
-    
-    def load_maintenance_mode(self):
-        """Lädt Wartungsmodus-Status"""
-        try:
-            if os.path.exists(MAINTENANCE_MODE_FILE):
-                with open(MAINTENANCE_MODE_FILE, 'r') as f:
-                    data = json.load(f)
-                    return data.get('enabled', False)
-            return False
-        except Exception as e:
-            logger.error(f"Fehler beim Laden des Wartungsmodus: {e}")
-            return False
-    
-    def set_maintenance_mode(self, enabled):
-        """Setzt Wartungsmodus (nur Admin)"""
-        self.maintenance_mode = enabled
-        self.save_maintenance_mode(enabled)
-        if not enabled:
-            # Reset Error-Counter bei manueller Deaktivierung
-            self.last_success_time = time.time()
-            self.error_count = 0
-        logger.info(f"Wartungsmodus {'aktiviert' if enabled else 'deaktiviert'}")
+    def save_staerke(self, staerke):
+        """Speichert geteilte Stärke"""
+        staerken = self.load_staerken()
+        if staerke not in staerken:
+            staerken.append(staerke)
+            with open(STAERKEN_FILE, 'w') as f:
+                f.write('\n'.join(staerken))
     
     def reset_staerken(self):
-        """Löscht Stärken-Liste"""
-        try:
-            with open(STAERKENFILE, "w", encoding="utf-8") as f:
-                f.write("")
-            logger.info("Stärken-Liste zurückgesetzt")
-        except Exception as e:
-            logger.error(f"Reset-Fehler: {e}")
+        """Setzt die Stärken-Liste zurück"""
+        if os.path.exists(STAERKEN_FILE):
+            os.remove(STAERKEN_FILE)
+        logger.info("Stärken-Liste zurückgesetzt")
+    
+    def find_template(self, screenshot_path):
+        """Sucht nach Template im Screenshot"""
+        if not os.path.exists(TEMPLATE_FILE):
+            logger.error(f"Template-Datei '{TEMPLATE_FILE}' nicht gefunden!")
+            return None
+        
+        screenshot = cv2.imread(screenshot_path)
+        template = cv2.imread(TEMPLATE_FILE)
+        
+        result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        
+        if max_val > 0.8:
+            h, w = template.shape[:2]
+            return (max_loc[0], max_loc[1], w, h)
+        return None
+    
+    def extract_text_from_region(self, screenshot_path, x, y, w, h):
+        """Extrahiert Text aus Region mit OCR"""
+        img = cv2.imread(screenshot_path)
+        region = img[y:y+h, x:x+w]
+        
+        # Verbesserung für OCR
+        gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+        
+        text = pytesseract.image_to_string(thresh, lang='deu+eng')
+        return text
+    
+    def extract_truck_info(self):
+        """Extrahiert LKW-Informationen aus Screenshot"""
+        if not self.make_screenshot():
+            return None
+        
+        location = self.find_template('screen.png')
+        if not location:
+            return None
+        
+        x, y, w, h = location
+        
+        # OCR für Stärke (rechts vom Template)
+        strength_text = self.extract_text_from_region('screen.png', x+w, y, 150, h)
+        strength_match = re.search(r'(\d+[,.]?\d*)\s*M', strength_text)
+        
+        # OCR für Server (über dem Template)
+        server_text = self.extract_text_from_region('screen.png', x, y-50, w+150, 50)
+        server_match = re.search(r'Server\s*(\d+)', server_text)
+        
+        if strength_match:
+            strength = strength_match.group(1).replace(',', '.')
+            server = server_match.group(1) if server_match else "?"
+            
+            return {
+                'strength': float(strength),
+                'server': server,
+                'coords': (x + w//2, y + h//2)
+            }
+        return None
+    
+    def share_truck(self):
+        """Teilt einen LKW"""
+        # Klick auf Teilen-Button
+        self.click(540, 1500)  # Anpassbar je nach Auflösung
+        time.sleep(2)
+        
+        # Wähle Chat-Typ basierend auf share_mode
+        if self.share_mode == 'alliance':
+            # A4O Chat
+            self.click(300, 800)
+        else:
+            # Weltchat
+            self.click(500, 800)
+        
+        time.sleep(1)
+        
+        # Bestätigen
+        self.click(540, 1200)
+        time.sleep(2)
     
     def bot_loop(self):
-        """Hauptschleife des Bots"""
+        """Haupt-Bot-Schleife"""
         logger.info("Bot-Schleife gestartet")
         
-        # Setup SSH-Tunnel
+        # SSH-Tunnel einrichten
         if not self.setup_ssh_tunnel():
-            self.status = "Fehler: SSH-Tunnel konnte nicht aufgebaut werden"
-            self.running = False
+            self.status = "SSH-Fehler"
             return
         
-        # Reset-Timer starten
+        self.status = "Läuft"
+        self.last_action = "Bot gestartet"
+        
+        # Timer-Thread starten wenn aktiviert
+        if self.use_timer:
+            self.timer_start_time = time.time()
+            self.timer_thread = threading.Thread(target=self.check_timer, daemon=True)
+            self.timer_thread.start()
+            logger.info(f"Timer gestartet für {self.timer_duration_minutes} Minuten")
+        
+        # Starte Reset-Timer
         reset_thread = threading.Thread(target=self.reset_timer, daemon=True)
         reset_thread.start()
         
+        # Deutsche Zeitzone
+        tz = pytz.timezone('Europe/Berlin')
+        
         while self.running:
+            # Pausieren wenn nötig
             if self.paused:
                 self.status = "Pausiert"
                 time.sleep(1)
                 continue
             
+            # Maintenance-Mode
+            if self.maintenance_mode:
+                self.status = "Maintenance-Mode"
+                time.sleep(10)
+                continue
+            
             try:
-                self.status = "Läuft - Suche LKWs..."
-                self.last_action = "Screenshot erstellen"
+                truck_info = self.extract_truck_info()
                 
-                if not self.make_screenshot('screen.png'):
-                    self.last_action = "Fehler: Screenshot fehlgeschlagen"
-                    time.sleep(5)
-                    continue
-                
-                time.sleep(0.5)
-                treffer = self.rentier_lkw_finden()
-                
-                if not treffer:
-                    self.last_action = "Kein LKW gefunden - ESC"
-                    self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
+                if truck_info:
                     self.trucks_processed += 1
-                    continue
-                
-                self.last_action = f"LKW gefunden bei {treffer[0]}"
-                logger.info(f"Treffer bei: {treffer[0]}")
-                
-                # Klicke auf LKW (mit Offset)
-                lx = treffer[0][0] + 5  # Angepasster Offset für kleineren Screen
-                ly = treffer[0][1] + 5
-                self.click(lx, ly)
-                
-                if not self.make_screenshot('info.png'):
-                    self.last_action = "Fehler: Info-Screenshot fehlgeschlagen"
-                    continue
-                
-                # Server-Check
-                if self.use_server_filter:
-                    self.last_action = "Prüfe Server..."
-                    if not self.ist_server_passend():
-                        self.last_action = f"Falscher Server - ESC"
-                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
-                        self.trucks_skipped += 1
-                        self.trucks_processed += 1
-                        continue
-                
-                # Stärke auslesen
-                self.last_action = "Lese Stärke..."
-                staerke = self.ocr_staerke()
-                wert = self.staerke_float_wert(staerke)
-                logger.info(f"Stärke gelesen: '{staerke}' Wert: {wert}")
-                
-                # Stärke-Check
-                limit_passed = True
-                if self.use_limit and wert is not None:
-                    if wert > self.strength_limit:
-                        limit_passed = False
-                        self.last_action = f"Stärke {wert} > {self.strength_limit} - übersprungen"
-                
-                if wert is None or not limit_passed or self.staerke_ist_bekannt(staerke):
-                    if wert is None:
-                        # Keine Stärke erkannt - Liste neu laden
-                        self.last_action = "Keine Stärke erkannt - Lade Liste neu"
-                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
-                        time.sleep(0.5)
-                        # Zweiter ESC zum Neuladen der LKW-Liste
-                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
-                    elif not limit_passed:
-                        self.last_action = f"Stärke {wert} > {self.strength_limit} - übersprungen"
-                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
-                    else:
-                        self.last_action = f"Stärke {staerke} bereits bekannt - übersprungen"
-                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
+                    strength_str = f"{truck_info['strength']:.1f}M"
+                    server_str = truck_info['server']
                     
-                    self.trucks_skipped += 1
-                    self.trucks_processed += 1
-                    continue
-                
-                # LKW teilen!
-                self.last_action = f"Teile LKW (Stärke: {staerke})"
-                self.notiere_staerke(staerke)
-                
-                # Server auslesen für Statistik
-                server = self.ocr_server() if self.use_server_filter else "Unknown"
-                
-                # Wähle Koordinaten basierend auf share_mode
-                if self.share_mode == "alliance":
-                    coords = COORDS_ALLIANCE
-                    mode_text = "Allianz-Chat"
+                    # Log Statistik
+                    self.log_truck_stat(strength_str, server_str)
+                    
+                    # Prüfe Filter
+                    skip = False
+                    
+                    # Stärke-Filter
+                    if self.use_limit and truck_info['strength'] > self.strength_limit:
+                        skip = True
+                        self.last_action = f"LKW {strength_str} übersprungen (zu stark)"
+                    
+                    # Server-Filter
+                    if self.use_server_filter and server_str != self.server_number:
+                        skip = True
+                        self.last_action = f"LKW Server {server_str} übersprungen"
+                    
+                    # Bereits geteilt?
+                    truck_id = f"{server_str}/{strength_str}"
+                    if truck_id in self.load_staerken():
+                        skip = True
+                        self.last_action = f"LKW {truck_id} bereits geteilt"
+                    
+                    if skip:
+                        self.trucks_skipped += 1
+                    else:
+                        # Teile LKW
+                        self.share_truck()
+                        self.save_staerke(truck_id)
+                        self.trucks_shared += 1
+                        
+                        zeit = datetime.now(tz).strftime('%H:%M:%S')
+                        self.last_action = f"[{zeit}] LKW {truck_id} geteilt ({self.share_mode})"
+                        logger.info(self.last_action)
+                        
+                        # Reset Fehler-Counter
+                        self.last_success_time = time.time()
+                        self.error_count = 0
+                        
+                        # Warte nach Teilen
+                        time.sleep(5)
+                    
+                    # Zurück und weiter suchen
+                    self.click(100, 100)  # Zurück-Button
+                    time.sleep(2)
+                    self.swipe(540, 1000, 540, 500)  # Nach oben scrollen
+                    time.sleep(2)
+                    
                 else:
-                    coords = COORDS_NEW
-                    mode_text = "Weltchat"
-                
-                self.last_action = f"Teile LKW im {mode_text} (Stärke: {staerke})"
-                
-                self.click(coords['share'][0], coords['share'][1])
-                self.click(coords['share_confirm1'][0], coords['share_confirm1'][1])
-                self.click(coords['share_confirm2'][0], coords['share_confirm2'][1])
-                self.click(coords['esc'][0], coords['esc'][1])
-                
-                self.trucks_shared += 1
-                self.trucks_processed += 1
-                self.last_action = f"LKW erfolgreich geteilt! ({self.trucks_shared} gesamt)"
-                
-                # Statistik speichern
-                self.log_truck_stat(staerke, server)
+                    # Kein LKW gefunden
+                    self.last_action = "Suche nach LKWs..."
+                    self.swipe(540, 1000, 540, 500)
+                    time.sleep(3)
+                    
+                    # Fehlerüberwachung
+                    self.error_count += 1
+                    if self.error_count > 30:
+                        logger.warning("Lange keine LKWs gefunden")
+                        self.error_count = 0
                 
             except Exception as e:
                 logger.error(f"Fehler in Bot-Schleife: {e}")
@@ -776,7 +763,7 @@ class BotController:
             self.paused = False
             self.thread = threading.Thread(target=self.bot_loop, daemon=True)
             self.thread.start()
-            logger.info("Bot gestartet")
+            logger.info(f"Bot gestartet von {self.current_user}")
     
     def pause(self):
         """Pausiert/Fortsetzt den Bot"""
@@ -787,14 +774,16 @@ class BotController:
     def stop(self):
         """Stoppt den Bot"""
         self.running = False
+        self.use_timer = False  # Timer deaktivieren
+        self.timer_start_time = None
         if self.thread:
             self.thread.join(timeout=10)
+        if self.timer_thread:
+            self.timer_thread.join(timeout=5)
         logger.info("Bot gestoppt")
 
 # Globale Bot-Instanz
 bot = BotController()
-
-# ================== User Management ==================
 
 # ================== Flask Routes ==================
 
@@ -853,6 +842,14 @@ def index():
 @app.route('/api/status')
 @login_required
 def api_status():
+    remaining_time = None
+    if bot.use_timer:
+        remaining_seconds = bot.get_remaining_time_seconds()
+        if remaining_seconds:
+            minutes = int(remaining_seconds // 60)
+            seconds = int(remaining_seconds % 60)
+            remaining_time = f"{minutes:02d}:{seconds:02d}"
+    
     return jsonify({
         'running': bot.running,
         'paused': bot.paused,
@@ -863,7 +860,9 @@ def api_status():
         'trucks_skipped': bot.trucks_skipped,
         'adb_connected': bot.adb_connected,
         'current_user': bot.current_user,
-        'maintenance_mode': bot.maintenance_mode
+        'maintenance_mode': bot.maintenance_mode,
+        'timer_remaining': remaining_time,
+        'use_timer': bot.use_timer
     })
 
 @app.route('/api/start', methods=['POST'])
@@ -883,7 +882,7 @@ def api_start():
         
         bot.current_user = current_user.username
         bot.start()
-        log_audit(current_user.username, 'Start Bot', '')
+        log_audit(current_user.username, 'Start Bot', f'Timer: {bot.use_timer}, Duration: {bot.timer_duration_minutes}min')
     
     return jsonify({'success': True})
 
@@ -919,6 +918,10 @@ def api_settings():
         bot.server_number = data.get('server_number', '49')
         bot.reset_interval = int(data.get('reset_interval', 15))
         
+        # Timer-Einstellungen
+        bot.use_timer = data.get('use_timer', False)
+        bot.timer_duration_minutes = int(data.get('timer_duration', 60))
+        
         # Share-Mode: Prüfe ob User wählen darf
         user_data = users.get(current_user.username, {})
         if user_data.get('can_choose_share_mode', True):
@@ -927,7 +930,10 @@ def api_settings():
             # User darf nicht wählen - nutze forced_mode
             bot.share_mode = user_data.get('forced_share_mode', 'world')
         
-        log_audit(current_user.username, 'Change Settings', f"limit={data.get('use_limit')}, strength={data.get('strength_limit')}, server={data.get('server_number')}, mode={bot.share_mode}")
+        log_audit(current_user.username, 'Change Settings', 
+                 f"limit={data.get('use_limit')}, strength={data.get('strength_limit')}, "
+                 f"server={data.get('server_number')}, mode={bot.share_mode}, "
+                 f"timer={bot.use_timer}, duration={bot.timer_duration_minutes}")
         
         return jsonify({'success': True})
     else:
@@ -937,6 +943,9 @@ def api_settings():
         can_choose = user_data.get('can_choose_share_mode', True)
         forced_mode = user_data.get('forced_share_mode', None)
         
+        # Prüfe ob Mode-Change-Request existiert
+        mode_request = bot.mode_change_requests.get(current_user.username, {})
+        
         return jsonify({
             'use_limit': bot.use_limit,
             'strength_limit': bot.strength_limit,
@@ -945,8 +954,26 @@ def api_settings():
             'reset_interval': bot.reset_interval,
             'share_mode': forced_mode if forced_mode and not can_choose else bot.share_mode,
             'can_choose_share_mode': can_choose,
-            'forced_share_mode': forced_mode
+            'forced_share_mode': forced_mode,
+            'use_timer': bot.use_timer,
+            'timer_duration': bot.timer_duration_minutes,
+            'mode_change_request': mode_request.get('status', None),
+            'requested_mode': mode_request.get('requested_mode', None)
         })
+
+@app.route('/api/request_mode_change', methods=['POST'])
+@login_required
+def api_request_mode_change():
+    """Fordert einen Modus-Wechsel an"""
+    data = request.json
+    requested_mode = data.get('requested_mode')
+    
+    if requested_mode in ['world', 'alliance']:
+        bot.request_mode_change(current_user.username, requested_mode)
+        log_audit(current_user.username, 'Request Mode Change', requested_mode)
+        return jsonify({'success': True})
+    
+    return jsonify({'error': 'Invalid mode'}), 400
 
 @app.route('/api/reset_stats', methods=['POST'])
 @login_required
@@ -957,25 +984,17 @@ def api_reset_stats():
     log_audit(current_user.username, 'Reset Statistics', '')
     return jsonify({'success': True})
 
-# ================== Admin Routes ==================
-
+# Admin Routes
 @app.route('/admin')
 @login_required
-def admin_dashboard():
+def admin():
     if current_user.role != 'admin':
         return redirect(url_for('index'))
-    return render_template('admin.html', t=translate, lang=get_language(), user=current_user)
+    return render_template('admin.html', user=current_user)
 
-@app.route('/admin/stats')
+@app.route('/api/admin/users')
 @login_required
-def admin_stats_page():
-    if current_user.role != 'admin':
-        return redirect(url_for('index'))
-    return render_template('stats.html', t=translate, lang=get_language(), user=current_user)
-
-@app.route('/api/admin/users', methods=['GET'])
-@login_required
-def api_admin_get_users():
+def api_admin_users():
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -985,172 +1004,157 @@ def api_admin_get_users():
         user_list.append({
             'username': username,
             'role': data['role'],
-            'blocked': data.get('blocked', False)
+            'blocked': data.get('blocked', False),
+            'can_choose_share_mode': data.get('can_choose_share_mode', True),
+            'forced_share_mode': data.get('forced_share_mode', None)
         })
     return jsonify({'users': user_list})
 
-@app.route('/api/admin/users/<username>/block', methods=['POST'])
+@app.route('/api/admin/user/toggle_block/<username>', methods=['POST'])
 @login_required
-def api_admin_block_user(username):
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    users = load_users()
-    if username in users and username != 'admin':
-        users[username]['blocked'] = True
-        save_users(users)
-        log_audit(current_user.username, 'Block User', username)
-        return jsonify({'success': True})
-    return jsonify({'error': 'User not found'}), 404
-
-@app.route('/api/admin/users/<username>/unblock', methods=['POST'])
-@login_required
-def api_admin_unblock_user(username):
+def api_admin_toggle_block(username):
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     users = load_users()
     if username in users:
-        users[username]['blocked'] = False
+        users[username]['blocked'] = not users[username].get('blocked', False)
         save_users(users)
-        log_audit(current_user.username, 'Unblock User', username)
+        log_audit(current_user.username, 'Toggle User Block', username)
         return jsonify({'success': True})
     return jsonify({'error': 'User not found'}), 404
 
-@app.route('/api/admin/users', methods=['POST'])
-@login_required
-def api_admin_add_user():
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    role = data.get('role', 'user')
-    
-    users = load_users()
-    if username in users:
-        return jsonify({'error': 'User already exists'}), 400
-    
-    users[username] = {
-        'password': generate_password_hash(password),
-        'role': role,
-        'blocked': False
-    }
-    save_users(users)
-    log_audit(current_user.username, 'Add User', username)
-    return jsonify({'success': True})
-
-@app.route('/api/admin/users/<username>', methods=['DELETE'])
-@login_required
-def api_admin_delete_user(username):
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    if username == 'admin':
-        return jsonify({'error': 'Cannot delete admin'}), 400
-    
-    users = load_users()
-    if username in users:
-        del users[username]
-        save_users(users)
-        log_audit(current_user.username, 'Delete User', username)
-        return jsonify({'success': True})
-    return jsonify({'error': 'User not found'}), 404
-
-@app.route('/api/admin/users/<username>/password', methods=['POST'])
-@login_required
-def api_admin_change_password(username):
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    data = request.json
-    new_password = data.get('password')
-    
-    users = load_users()
-    if username in users:
-        users[username]['password'] = generate_password_hash(new_password)
-        save_users(users)
-        log_audit(current_user.username, 'Change Password', username)
-        return jsonify({'success': True})
-    return jsonify({'error': 'User not found'}), 404
-
-@app.route('/api/admin/audit', methods=['GET'])
-@login_required
-def api_admin_get_audit():
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    if os.path.exists(AUDIT_LOG_FILE):
-        with open(AUDIT_LOG_FILE, 'r') as f:
-            logs = json.load(f)
-        return jsonify({'logs': logs[-100:]})
-    return jsonify({'logs': []})
-
-@app.route('/api/admin/users/<username>/share_mode', methods=['POST'])
+@app.route('/api/admin/user/set_share_mode/<username>', methods=['POST'])
 @login_required
 def api_admin_set_share_mode(username):
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     data = request.json
-    can_choose = data.get('can_choose', True)
-    forced_mode = data.get('forced_mode', None)
-    
     users = load_users()
     if username in users:
-        users[username]['can_choose_share_mode'] = can_choose
-        users[username]['forced_share_mode'] = forced_mode
+        users[username]['can_choose_share_mode'] = data.get('can_choose', True)
+        users[username]['forced_share_mode'] = data.get('forced_mode', None)
         save_users(users)
-        log_audit(current_user.username, 'Set Share Mode', f"{username}: can_choose={can_choose}, forced={forced_mode}")
+        log_audit(current_user.username, 'Set User Share Mode', f"{username}: {data}")
         return jsonify({'success': True})
     return jsonify({'error': 'User not found'}), 404
 
-@app.route('/api/admin/maintenance', methods=['GET', 'POST'])
+@app.route('/api/admin/mode_requests')
+@login_required
+def api_admin_mode_requests():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    return jsonify({'requests': bot.mode_change_requests})
+
+@app.route('/api/admin/approve_mode_change/<username>', methods=['POST'])
+@login_required
+def api_admin_approve_mode_change(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if bot.approve_mode_change(username):
+        log_audit(current_user.username, 'Approve Mode Change', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'Request not found'}), 404
+
+@app.route('/api/admin/reject_mode_change/<username>', methods=['POST'])
+@login_required
+def api_admin_reject_mode_change(username):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if bot.reject_mode_change(username):
+        log_audit(current_user.username, 'Reject Mode Change', username)
+        return jsonify({'success': True})
+    return jsonify({'error': 'Request not found'}), 404
+
+@app.route('/api/admin/stats')
+@login_required
+def api_admin_stats():
+    """API für Truck-Statistiken"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    # Zeitbereich aus Query-Parametern
+    start_str = request.args.get('start', '')
+    end_str = request.args.get('end', '')
+    
+    # Lade Statistiken
+    if os.path.exists(STATS_FILE):
+        try:
+            with open(STATS_FILE, 'r') as f:
+                content = f.read().strip()
+                if content:
+                    all_stats = json.loads(content)
+                else:
+                    all_stats = []
+        except (json.JSONDecodeError, ValueError):
+            logger.error("Fehler beim Laden der Statistiken")
+            all_stats = []
+    else:
+        all_stats = []
+    
+    # Filter nach Zeitbereich wenn angegeben
+    filtered_stats = []
+    for stat in all_stats:
+        try:
+            stat_time = datetime.fromisoformat(stat['timestamp'].replace('Z', '+00:00'))
+            include = True
+            
+            if start_str:
+                start_time = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                if stat_time < start_time:
+                    include = False
+            
+            if end_str:
+                end_time = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                if stat_time > end_time:
+                    include = False
+            
+            if include:
+                filtered_stats.append(stat)
+        except Exception as e:
+            logger.error(f"Fehler beim Filtern der Statistik: {e}")
+            continue
+    
+    return jsonify({'trucks': filtered_stats})
+
+@app.route('/api/admin/audit_log')
+@login_required
+def api_admin_audit_log():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if os.path.exists(AUDIT_LOG_FILE):
+        with open(AUDIT_LOG_FILE, 'r') as f:
+            logs = json.load(f)
+    else:
+        logs = []
+    
+    # Nur letzte 100 Einträge
+    return jsonify({'logs': logs[-100:]})
+
+@app.route('/api/admin/maintenance', methods=['POST'])
 @login_required
 def api_admin_maintenance():
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
-    if request.method == 'POST':
-        data = request.json
-        enabled = data.get('enabled', False)
-        bot.set_maintenance_mode(enabled)
-        log_audit(current_user.username, 'Set Maintenance Mode', f"enabled={enabled}")
-        return jsonify({'success': True})
-    else:
-        return jsonify({'enabled': bot.maintenance_mode})
+    data = request.json
+    enabled = data.get('enabled', False)
+    bot.set_maintenance_mode(enabled)
+    log_audit(current_user.username, 'Set Maintenance Mode', str(enabled))
+    
+    return jsonify({'success': True})
 
-@app.route('/api/admin/stats', methods=['GET'])
+@app.route('/stats')
 @login_required
-def api_admin_get_stats():
+def stats_page():
     if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    
-    if not os.path.exists(TRUCK_DATA_FILE):
-        return jsonify({'trucks': []})
-    
-    with open(TRUCK_DATA_FILE, 'r') as f:
-        trucks = json.load(f)
-    
-    # Filtern nach Datum
-    if start_date and end_date:
-        tz = pytz.timezone('Europe/Berlin')
-        start = datetime.fromisoformat(start_date).replace(tzinfo=tz)
-        end = datetime.fromisoformat(end_date).replace(tzinfo=tz)
-        
-        filtered = []
-        for truck in trucks:
-            truck_time = datetime.fromisoformat(truck['timestamp'])
-            if start <= truck_time <= end:
-                filtered.append(truck)
-        trucks = filtered
-    
-    return jsonify({'trucks': trucks})
+        return redirect(url_for('index'))
+    return render_template('stats.html', user=current_user)
 
 if __name__ == '__main__':
-    # Für Raspberry Pi: Lausche auf allen Interfaces
     app.run(host='0.0.0.0', port=5000, debug=False)
