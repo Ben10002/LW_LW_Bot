@@ -72,7 +72,8 @@ TRANSLATIONS = {
         'request_mode_change': 'Modus-Wechsel anfordern',
         'mode_change_requested': 'Modus-Wechsel angefordert',
         'maintenance_active': 'Wartungsarbeiten aktiv',
-        'maintenance_message': 'Bot ist im Wartungsmodus - Bitte warten Sie'
+        'maintenance_message': 'Bot ist im Wartungsmodus - Bitte warten Sie',
+        'maintenance_admin_info': 'Admin-Modus: Sie können weiterhin alle Funktionen nutzen'
     },
     'en': {
         'app_title': 'Truck Bot Control',
@@ -121,7 +122,8 @@ TRANSLATIONS = {
         'request_mode_change': 'Request mode change',
         'mode_change_requested': 'Mode change requested',
         'maintenance_active': 'Maintenance active',
-        'maintenance_message': 'Bot is in maintenance mode - Please wait'
+        'maintenance_message': 'Bot is in maintenance mode - Please wait',
+        'maintenance_admin_info': 'Admin mode: You can still use all functions'
     }
 }
 
