@@ -684,6 +684,18 @@
             });
         }
         
+        // Lade Maintenance-Status
+        function loadMaintenanceStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const toggle = document.getElementById('maintenanceToggle');
+                    if (toggle) {
+                        toggle.checked = data.maintenance_mode || false;
+                    }
+                });
+        }
+        
         // Logs löschen
         function clearLogs() {
             if (confirm('Wirklich alle Logs löschen?')) {
@@ -724,11 +736,13 @@
         loadUsers();
         loadModeRequests();
         loadAuditLog();
+        loadMaintenanceStatus();
         
         // Auto-Refresh alle 5 Sekunden
         setInterval(() => {
             loadModeRequests();
             loadAuditLog();
+            loadMaintenanceStatus();
         }, 5000);
         
         // Modal schließen bei Klick außerhalb

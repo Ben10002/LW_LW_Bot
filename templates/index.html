@@ -454,6 +454,13 @@
             </div>
         </div>
         
+        <!-- Admin Maintenance Notice (non-blocking) -->
+        {% if user.role == 'admin' %}
+        <div id="adminMaintenanceNotice" class="maintenance-mode" style="display: none;">
+            ⚠️ {{ t('maintenance_active') }} - {{ t('maintenance_admin_info') }}
+        </div>
+        {% endif %}
+        
         <div id="alerts"></div>
         
         <div class="card">
@@ -632,12 +639,26 @@
                     document.getElementById('trucksShared').textContent = data.trucks_shared;
                     document.getElementById('trucksSkipped').textContent = data.trucks_skipped;
                     
-                    // Maintenance-Mode
+                    // Maintenance-Mode - nur für nicht-Admin User anzeigen
                     const maintenanceOverlay = document.getElementById('maintenanceOverlay');
-                    if (data.maintenance_mode) {
+                    const isAdmin = '{{ user.role }}' === 'admin';
+                    
+                    if (data.maintenance_mode && !isAdmin) {
                         maintenanceOverlay.style.display = 'flex';
                     } else {
                         maintenanceOverlay.style.display = 'none';
+                    }
+                    
+                    // Admin Maintenance Notice - zeige Info für Admins
+                    if (isAdmin) {
+                        const adminNotice = document.getElementById('adminMaintenanceNotice');
+                        if (adminNotice) {
+                            if (data.maintenance_mode) {
+                                adminNotice.style.display = 'block';
+                            } else {
+                                adminNotice.style.display = 'none';
+                            }
+                        }
                     }
                     
                     // Timer-Info
