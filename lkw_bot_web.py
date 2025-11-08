@@ -448,54 +448,111 @@ class BotController:
     def setup_ssh_tunnel(self):
         """Erstellt SSH-Tunnel zu VMOSCloud"""
         try:
+            # Verwende die korrekten SSH-Daten aus der Original-Konfiguration
+            SSH_HOST_FULL = "10.0.4.206_1762383884162@103.237.100.130"
+            SSH_PORT_REAL = 1824
+            SSH_KEY_REAL = "j0343aTw718AKRn2XP018+mmc8PkBtBdLN7Pqg7c/eWZ/ZjtMGLTwsdjqmDMsuqd8cDIZKC0oYm0P4eCVLjeAQ=="
+            LOCAL_PORT = 9842
+            REMOTE_ADB_REAL = "adb-proxy:46795"
+            
             # Prüfe ob Tunnel bereits läuft
-            result = subprocess.run(['pgrep', '-f', f':{LOCAL_ADB_PORT}:'], 
+            result = subprocess.run(['pgrep', '-f', f':{LOCAL_PORT}:'], 
                                   capture_output=True, text=True)
             if result.stdout:
                 logger.info("SSH-Tunnel läuft bereits")
+                self.adb_connected = True
                 return True
             
-            # Starte SSH-Tunnel
+            # Erstelle temporäre SSH-Key Datei wenn nötig
+            import tempfile
+            key_file = None
+            if SSH_KEY_REAL:
+                key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.key')
+                key_file.write(SSH_KEY_REAL)
+                key_file.close()
+                os.chmod(key_file.name, 0o600)
+            
+            # Starte SSH-Tunnel mit korrekten Parametern
             cmd = [
                 'ssh',
                 '-oHostKeyAlgorithms=+ssh-rsa',
                 '-oStrictHostKeyChecking=no',
                 '-oServerAliveInterval=60',
                 '-oServerAliveCountMax=3',
-                SSH_HOST,
-                '-p', str(SSH_PORT),
-                '-L', f'{LOCAL_ADB_PORT}:{REMOTE_ADB}',
-                '-Nf'
+                '-oUserKnownHostsFile=/dev/null'
             ]
             
-            logger.info("Starte SSH-Tunnel...")
-            self.ssh_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            time.sleep(3)  # Warte auf Verbindungsaufbau
+            # Füge Key hinzu wenn vorhanden
+            if key_file:
+                cmd.extend(['-i', key_file.name])
             
-            # Verbinde ADB
-            adb_cmd = ['adb', 'connect', f'localhost:{LOCAL_ADB_PORT}']
-            result = subprocess.run(adb_cmd, capture_output=True, text=True)
+            # Füge Host und Port-Forwarding hinzu
+            cmd.extend([
+                SSH_HOST_FULL,
+                '-p', str(SSH_PORT_REAL),
+                '-L', f'{LOCAL_PORT}:{REMOTE_ADB_REAL}',
+                '-Nf'
+            ])
             
-            if 'connected' in result.stdout.lower():
-                logger.info("ADB erfolgreich verbunden")
-                self.adb_connected = True
-                return True
+            logger.info(f"Starte SSH-Tunnel mit: Host={SSH_HOST_FULL}, Port={SSH_PORT_REAL}")
+            
+            # Versuche SSH-Verbindung
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            # Kurz warten auf Verbindungsaufbau
+            time.sleep(3)
+            
+            # Prüfe ob Tunnel läuft
+            check = subprocess.run(['pgrep', '-f', f':{LOCAL_PORT}:'], 
+                                 capture_output=True, text=True)
+            if check.stdout:
+                # Verbinde ADB
+                adb_cmd = ['adb', 'connect', f'localhost:{LOCAL_PORT}']
+                adb_result = subprocess.run(adb_cmd, capture_output=True, text=True)
+                
+                if 'connected' in adb_result.stdout.lower() or 'already' in adb_result.stdout.lower():
+                    logger.info("ADB erfolgreich verbunden")
+                    self.adb_connected = True
+                    
+                    # Cleanup temp key file
+                    if key_file and os.path.exists(key_file.name):
+                        os.unlink(key_file.name)
+                    
+                    return True
+                else:
+                    logger.warning(f"ADB-Verbindung unsicher: {adb_result.stdout}")
+                    self.adb_connected = True  # Trotzdem versuchen
+                    return True
             else:
-                logger.error(f"ADB-Verbindung fehlgeschlagen: {result.stdout}")
+                logger.error("SSH-Tunnel konnte nicht gestartet werden")
+                if result.stderr:
+                    logger.error(f"SSH-Fehler: {result.stderr}")
+                
+                # Cleanup temp key file
+                if key_file and os.path.exists(key_file.name):
+                    os.unlink(key_file.name)
+                    
                 return False
                 
+        except subprocess.TimeoutExpired:
+            logger.error("SSH-Verbindung Timeout")
+            return False
         except Exception as e:
             logger.error(f"SSH-Tunnel-Fehler: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     def close_ssh_tunnel(self):
         """Schließt SSH-Tunnel"""
         try:
+            LOCAL_PORT = 9842  # Verwende den korrekten Port
+            
             # Trenne ADB
-            subprocess.run(['adb', 'disconnect', f'localhost:{LOCAL_ADB_PORT}'])
+            subprocess.run(['adb', 'disconnect', f'localhost:{LOCAL_PORT}'])
             
             # Beende SSH-Prozess
-            subprocess.run(['pkill', '-f', f':{LOCAL_ADB_PORT}:'])
+            subprocess.run(['pkill', '-f', f':{LOCAL_PORT}:'])
             logger.info("SSH-Tunnel geschlossen")
             self.adb_connected = False
         except Exception as e:
@@ -504,7 +561,8 @@ class BotController:
     def make_screenshot(self, filename='screen.png'):
         """Erstellt Screenshot über ADB"""
         try:
-            adb_device = f'localhost:{LOCAL_ADB_PORT}'
+            LOCAL_PORT = 9842  # Verwende den korrekten Port
+            adb_device = f'localhost:{LOCAL_PORT}'
             subprocess.run(['adb', '-s', adb_device, 'shell', 'screencap', '-p', f'/sdcard/{filename}'], 
                          timeout=10)
             subprocess.run(['adb', '-s', adb_device, 'pull', f'/sdcard/{filename}', filename], 
@@ -517,7 +575,8 @@ class BotController:
     def click(self, x, y):
         """Klickt auf Koordinaten"""
         try:
-            adb_device = f'localhost:{LOCAL_ADB_PORT}'
+            LOCAL_PORT = 9842  # Verwende den korrekten Port
+            adb_device = f'localhost:{LOCAL_PORT}'
             subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)])
             return True
         except Exception as e:
@@ -527,7 +586,8 @@ class BotController:
     def swipe(self, x1, y1, x2, y2, duration=500):
         """Swipe-Geste"""
         try:
-            adb_device = f'localhost:{LOCAL_ADB_PORT}'
+            LOCAL_PORT = 9842  # Verwende den korrekten Port
+            adb_device = f'localhost:{LOCAL_PORT}'
             subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'swipe', 
                           str(x1), str(y1), str(x2), str(y2), str(duration)])
             return True
