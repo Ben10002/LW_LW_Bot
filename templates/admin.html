@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - LKW-Bot</title>
     <style>
+        /* === Globale Stile (Kombiniert) === */
         * {
             margin: 0;
             padding: 0;
@@ -22,7 +23,8 @@
             max-width: 1400px;
             margin: 0 auto;
         }
-        
+
+        /* === Header (V1/V2 - Identisch) === */
         .header {
             background: white;
             padding: 20px 30px;
@@ -39,11 +41,18 @@
             font-size: 28px;
         }
         
+        .header small {
+            color: #6c757d;
+            display: block;
+            margin-top: 5px;
+        }
+        
         .header-actions {
             display: flex;
             gap: 15px;
         }
-        
+
+        /* === Buttons (V1/V2 - Kombiniert) === */
         .btn {
             padding: 10px 20px;
             border: none;
@@ -56,48 +65,31 @@
             transition: all 0.3s;
         }
         
-        .btn-primary {
-            background: #667eea;
-            color: white;
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; transform: translateY(-2px); }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; transform: translateY(-2px); }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; transform: translateY(-2px); }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-warning:hover { background: #e0a800; transform: translateY(-2px); }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
         }
         
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-        
-        .btn-warning {
-            background: #ffc107;
-            color: #000;
-        }
-        
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
+        /* === Karten & Layout (V1/V2) === */
         .card {
             background: white;
             padding: 25px;
             border-radius: 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
             overflow-x: auto;
         }
         
@@ -108,16 +100,65 @@
             border-bottom: 2px solid #f0f0f0;
             padding-bottom: 10px;
         }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* === Formulare (V1/V2 Kombiniert) === */
+        .form-group {
+            margin-bottom: 15px;
+        }
         
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input, 
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, 
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        
+        .form-group small {
+            color: #6c757d;
+            font-size: 12px;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* === Tabellen & Badges (V1) === */
         table {
             width: 100%;
             border-collapse: collapse;
             table-layout: auto;
         }
         
-        thead {
-            background: #f8f9fa;
-        }
+        thead { background: #f8f9fa; }
         
         th, td {
             text-align: left;
@@ -131,10 +172,7 @@
             min-width: 280px;
         }
         
-        th {
-            font-weight: 600;
-            color: #495057;
-        }
+        th { font-weight: 600; color: #495057; }
         
         .badge {
             padding: 4px 10px;
@@ -143,40 +181,13 @@
             font-weight: 600;
         }
         
-        .badge-admin {
-            background: #667eea;
-            color: white;
-        }
-        
-        .badge-user {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .badge-blocked {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .badge-active {
-            background: #28a745;
-            color: white;
-        }
-        
-        .badge-pending {
-            background: #ffc107;
-            color: #000;
-        }
-        
-        .badge-approved {
-            background: #28a745;
-            color: white;
-        }
-        
-        .badge-rejected {
-            background: #dc3545;
-            color: white;
-        }
+        .badge-admin { background: #667eea; color: white; }
+        .badge-user { background: #6c757d; color: white; }
+        .badge-blocked { background: #dc3545; color: white; }
+        .badge-active { background: #28a745; color: white; }
+        .badge-pending { background: #ffc107; color: #000; }
+        .badge-approved { background: #28a745; color: white; }
+        .badge-rejected { background: #dc3545; color: white; }
         
         .action-btns {
             display: flex;
@@ -190,25 +201,7 @@
             white-space: nowrap;
         }
         
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #495057;
-        }
-        
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        
+        /* === Audit Log & Modus-Anfragen (V1) === */
         .audit-log {
             max-height: 400px;
             overflow-y: auto;
@@ -224,7 +217,28 @@
             color: #6c757d;
             font-size: 11px;
         }
+
+        .request-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+        }
         
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .request-info {
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        /* === Modals (V1) === */
         .modal {
             display: none;
             position: fixed;
@@ -234,11 +248,12 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
+            overflow-y: auto;
         }
         
         .modal-content {
             background: white;
-            margin: 15% auto;
+            margin: 10% auto;
             padding: 30px;
             border-radius: 15px;
             width: 80%;
@@ -253,10 +268,9 @@
             cursor: pointer;
         }
         
-        .close:hover {
-            color: #000;
-        }
+        .close:hover { color: #000; }
         
+        /* === Switch (V1) === */
         .switch {
             position: relative;
             display: inline-block;
@@ -264,11 +278,7 @@
             height: 24px;
         }
         
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
         
         .slider {
             position: absolute;
@@ -294,46 +304,195 @@
             border-radius: 50%;
         }
         
-        input:checked + .slider {
-            background-color: #667eea;
+        input:checked + .slider { background-color: #667eea; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        
+        /* === SSH / V2 Spezifische Stile === */
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out;
         }
         
-        input:checked + .slider:before {
-            transform: translateX(26px);
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        .request-card {
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        
+        .info-box {
+            background: linear-gradient(135deg, #e7f3ff 0%, #f0f7ff 100%);
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .info-box code {
+            background: #f4f4f4;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: #d63384;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .config-info {
             background: #f8f9fa;
             padding: 15px;
             border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #dee2e6;
+            margin-top: 15px;
         }
         
-        .request-header {
+        .config-info-item {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
         }
         
-        .request-info {
-            font-size: 14px;
-            color: #495057;
+        .config-info-item:last-child { border-bottom: none; }
+        
+        .config-info-label { font-weight: 600; color: #555; }
+        
+        .config-info-value {
+            color: #667eea;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
         }
+
     </style>
 </head>
 <body>
     <div class="container">
+        
         <div class="header">
             <div>
                 <h1>👨‍💼 Admin Dashboard</h1>
-                <small style="color: #6c757d;">LKW-Bot Verwaltung</small>
+                <small>LKW-Bot Verwaltung & VMOS Steuerung</small>
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary" onclick="location.href='/stats'">📊 Statistiken</button>
                 <button class="btn btn-secondary" onclick="location.href='/'">← Zurück</button>
                 <button class="btn btn-danger" onclick="location.href='/logout'">Abmelden</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔐 SSH-Konfiguration (VMOSCloud)</h2>
+            
+            <div id="sshStatus"></div>
+            
+            <div class="info-box">
+                <h3>ℹ️ Anleitung - So funktioniert's</h3>
+                <p><strong>1. SSH-Command von VMOSCloud kopieren:</strong></p>
+                <p>Gehe zu VMOSCloud → Wähle dein Gerät → Suche "ADB Connect"</p>
+                <p>Beispiel: <code>ssh -oHostKeyAlgorithms=+ssh-rsa ...@HOST... -p PORT -L 8583:adb-proxy:50438 -Nf</code></p>
+                
+                <p style="margin-top: 15px;"><strong>2. SSH-Passwort eingeben</strong> (falls vorhanden)</p>
+                
+                <p style="margin-top: 15px;"><strong>3. Speichern & Testen</strong> (Der Bot extrahiert den lokalen Port automatisch)</p>
+                
+                <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; color: #856404;">
+                    <strong>⚠️ Wichtig:</strong> Diese Daten ändern sich alle 24 Stunden bei VMOSCloud!
+                </p>
+            </div>
+
+            <form id="sshConfigForm">
+                <div class="form-group">
+                    <label for="sshCommand">SSH-Command * (vollständig)</label>
+                    <textarea 
+                        id="sshCommand" 
+                        name="ssh_command" 
+                        required 
+                        placeholder="ssh -oHostKeyAlgorithms=+ssh-rsa USER@HOST -p PORT -L LOCAL_PORT:adb-proxy:REMOTE_PORT -Nf"
+                    ></textarea>
+                    <small>📋 Kopiere den kompletten SSH-Command von VMOSCloud</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="sshPassword">SSH-Passwort (optional)</label>
+                    <input 
+                        type="password" 
+                        id="sshPassword" 
+                        name="ssh_password" 
+                        placeholder="Falls VMOSCloud ein Passwort verlangt..."
+                        autocomplete="new-password"
+                    >
+                    <small>🔒 Wird nur benötigt, falls VMOSCloud es fordert</small>
+                </div>
+
+                <div class="config-info">
+                    <div class="config-info-item">
+                        <span class="config-info-label">Lokaler ADB-Port:</span>
+                        <span class="config-info-value" id="localPort">Nicht extrahiert</span>
+                    </div>
+                    <div class="config-info-item">
+                        <span class="config-info-label">Letzte Aktualisierung:</span>
+                        <span class="config-info-value" id="lastUpdated">Nie</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">💾 Speichern</button>
+                    <button type="button" class="btn btn-success" onclick="testSSH()">🔌 Verbindung testen</button>
+                </div>
+            </form>
+
+            <div id="loading">
+                <div class="spinner"></div>
+                <p style="color: #667eea; font-weight: 600;">Teste Verbindung...</p>
+                <small style="color: #6c757d;">Dies kann 10-15 Sekunden dauern</small>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>💡 Tipps & Tricks</h2>
+            <div style="color: #555; line-height: 1.8;">
+                <p><strong>🔄 Tägliche Routine:</strong> VMOSCloud ändert die SSH-Daten alle 24 Stunden. Setze dir einen Reminder!</p>
+                <p style="margin-top: 10px;"><strong>🐛 Fehlersuche:</strong> Wenn der Bot nicht startet, teste hier die SSH-Verbindung.</p>
+                <p style="margin-top: 10px;"><strong>🔐 Sicherheit:</strong> Die SSH-Daten werden lokal in <code>ssh_config.json</code> gespeichert.</p>
             </div>
         </div>
         
@@ -351,8 +510,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Wird per JS gefüllt -->
-                    </tbody>
+                        </tbody>
                 </table>
                 <button class="btn btn-primary" style="margin-top: 15px;" onclick="openAddUserModal()">➕ Benutzer hinzufügen</button>
             </div>
@@ -360,14 +518,13 @@
             <div class="card">
                 <h2>🔄 Modus-Wechsel-Anfragen</h2>
                 <div id="modeRequests">
-                    <!-- Wird per JS gefüllt -->
-                </div>
+                    </div>
             </div>
         </div>
         
         <div class="card">
             <h2>🛠️ System-Steuerung</h2>
-            <div style="display: flex; gap: 20px; align-items: center;">
+            <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
                 <div>
                     <label class="switch">
                         <input type="checkbox" id="maintenanceToggle" onchange="toggleMaintenance()">
@@ -383,12 +540,10 @@
         <div class="card">
             <h2>📋 Audit-Log</h2>
             <div class="audit-log" id="auditLog">
-                <!-- Wird per JS gefüllt -->
-            </div>
+                </div>
         </div>
     </div>
     
-    <!-- Modal für Benutzer hinzufügen -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeAddUserModal()">&times;</span>
@@ -422,7 +577,6 @@
         </div>
     </div>
     
-    <!-- Modal für Share-Mode ändern -->
     <div id="shareModeModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeShareModeModal()">&times;</span>
@@ -450,32 +604,30 @@
     </div>
     
     <script>
+        // === V1: Benutzer, Anfragen, Logs ===
+        
         // Lade Benutzer
         function loadUsers() {
             fetch('/api/admin/users')
                 .then(response => response.json())
                 .then(data => {
                     const tbody = document.querySelector('#usersTable tbody');
+                    if (!tbody) return;
                     tbody.innerHTML = '';
                     
                     data.users.forEach(user => {
                         const row = tbody.insertRow();
-                        
-                        // Benutzername
                         row.insertCell(0).innerHTML = `<strong>${user.username}</strong>`;
                         
-                        // Rolle
                         const roleCell = row.insertCell(1);
                         const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-user';
                         roleCell.innerHTML = `<span class="badge ${roleBadge}">${user.role}</span>`;
                         
-                        // Status
                         const statusCell = row.insertCell(2);
                         const statusBadge = user.blocked ? 'badge-blocked' : 'badge-active';
                         const statusText = user.blocked ? 'Gesperrt' : 'Aktiv';
                         statusCell.innerHTML = `<span class="badge ${statusBadge}">${statusText}</span>`;
                         
-                        // Share-Mode
                         const modeCell = row.insertCell(3);
                         if (user.can_choose_share_mode) {
                             modeCell.innerHTML = '<span class="badge badge-active">Frei wählbar</span>';
@@ -485,7 +637,6 @@
                             modeCell.innerHTML = '<span class="badge badge-user">Standard</span>';
                         }
                         
-                        // Aktionen
                         const actionsCell = row.insertCell(4);
                         actionsCell.innerHTML = `
                             <div class="action-btns">
@@ -501,7 +652,8 @@
                             </div>
                         `;
                     });
-                });
+                })
+                .catch(err => console.error("Fehler beim Laden der Benutzer:", err));
         }
         
         // Lade Modus-Wechsel-Anfragen
@@ -510,6 +662,7 @@
                 .then(response => response.json())
                 .then(data => {
                     const container = document.getElementById('modeRequests');
+                    if (!container) return;
                     container.innerHTML = '';
                     
                     const requests = Object.entries(data.requests).filter(([user, req]) => req.status === 'pending');
@@ -522,7 +675,6 @@
                     requests.forEach(([username, request]) => {
                         const requestCard = document.createElement('div');
                         requestCard.className = 'request-card';
-                        
                         const timestamp = new Date(request.timestamp).toLocaleString('de-DE');
                         
                         requestCard.innerHTML = `
@@ -544,10 +696,10 @@
                                 </div>
                             </div>
                         `;
-                        
                         container.appendChild(requestCard);
                     });
-                });
+                })
+                .catch(err => console.error("Fehler beim Laden der Modus-Anfragen:", err));
         }
         
         // Modus-Anfrage genehmigen
@@ -557,7 +709,7 @@
                 .then(() => {
                     loadModeRequests();
                     loadUsers();
-                    showAlert('Anfrage genehmigt', 'success');
+                    showToastAlert('Anfrage genehmigt', 'success');
                 });
         }
         
@@ -567,7 +719,7 @@
                 .then(response => response.json())
                 .then(() => {
                     loadModeRequests();
-                    showAlert('Anfrage abgelehnt', 'warning');
+                    showToastAlert('Anfrage abgelehnt', 'warning');
                 });
         }
         
@@ -577,9 +729,9 @@
                 .then(response => response.json())
                 .then(data => {
                     const container = document.getElementById('auditLog');
+                    if (!container) return;
                     container.innerHTML = '';
                     
-                    // Neueste zuerst
                     data.logs.reverse().forEach(entry => {
                         const div = document.createElement('div');
                         div.className = 'audit-entry';
@@ -590,7 +742,8 @@
                         `;
                         container.appendChild(div);
                     });
-                });
+                })
+                .catch(err => console.error("Fehler beim Laden des Audit-Logs:", err));
         }
         
         // Benutzer sperren/entsperren
@@ -603,7 +756,7 @@
                 });
         }
         
-        // Share-Mode Modal öffnen
+        // Share-Mode Modal
         function openShareModeModal(username, canChoose, forcedMode) {
             document.getElementById('modalUsername').value = username;
             document.getElementById('modalCanChoose').value = canChoose.toString();
@@ -640,7 +793,7 @@
                 closeShareModeModal();
                 loadUsers();
                 loadAuditLog();
-                showAlert('Share-Mode aktualisiert', 'success');
+                showToastAlert('Share-Mode aktualisiert', 'success');
             });
         }
         
@@ -680,7 +833,7 @@
             })
             .then(response => response.json())
             .then(() => {
-                showAlert(enabled ? 'Maintenance-Mode aktiviert' : 'Maintenance-Mode deaktiviert', 'warning');
+                showToastAlert(enabled ? 'Maintenance-Mode aktiviert' : 'Maintenance-Mode deaktiviert', 'warning');
             });
         }
         
@@ -701,6 +854,7 @@
             if (confirm('Wirklich alle Logs löschen?')) {
                 // Diese Funktion müsste im Backend implementiert werden
                 alert('Log-Löschung - Backend-Implementation erforderlich');
+                showToastAlert('Logs gelöscht (simuliert)', 'success');
             }
         }
         
@@ -709,11 +863,12 @@
             if (confirm('WARNUNG: Wirklich ALLE Statistiken löschen? Dies kann nicht rückgängig gemacht werden!')) {
                 // Diese Funktion müsste im Backend implementiert werden
                 alert('Stats-Reset - Backend-Implementation erforderlich');
+                showToastAlert('Stats zurückgesetzt (simuliert)', 'danger');
             }
         }
         
-        // Alert anzeigen
-        function showAlert(message, type) {
+        // Toast Alert anzeigen (V1)
+        function showToastAlert(message, type) {
             const alert = document.createElement('div');
             alert.style.cssText = `
                 position: fixed;
@@ -731,26 +886,170 @@
             
             setTimeout(() => alert.remove(), 3000);
         }
+
+        // === V2: SSH Konfiguration ===
+
+        // Status Alert anzeigen (V2)
+        function showSshAlert(message, type) {
+            const statusDiv = document.getElementById('sshStatus');
+            if (!statusDiv) return;
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'error' ? 'alert-error' : 
+                              type === 'warning' ? 'alert-warning' : 'alert-info';
+            
+            statusDiv.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // SSH Config laden
+        function loadSSHConfig() {
+            fetch('/api/admin/ssh_config')
+                .then(r => r.json())
+                .then(data => {
+                    const sshCmdEl = document.getElementById('sshCommand');
+                    if (sshCmdEl) sshCmdEl.value = data.ssh_command || '';
+                    
+                    const sshPwEl = document.getElementById('sshPassword');
+                    if (sshPwEl) sshPwEl.value = data.ssh_password || '';
+                    
+                    const localPortEl = document.getElementById('localPort');
+                    if (localPortEl) {
+                        if (data.local_adb_port) {
+                            localPortEl.textContent = data.local_adb_port;
+                        } else {
+                            localPortEl.textContent = 'Nicht extrahiert';
+                        }
+                    }
+                    
+                    const lastUpdatedEl = document.getElementById('lastUpdated');
+                    if (lastUpdatedEl) {
+                        if (data.last_updated) {
+                            const date = new Date(data.last_updated);
+                            lastUpdatedEl.textContent = date.toLocaleString('de-DE');
+                        } else {
+                            lastUpdatedEl.textContent = 'Nie';
+                        }
+                    }
+                    
+                    const statusDiv = document.getElementById('sshStatus');
+                    if (statusDiv && !statusDiv.innerHTML) { // Nur setzen, wenn kein Alert da ist
+                        if (data.ssh_command) {
+                            statusDiv.innerHTML = '<div class="alert alert-success">✅ SSH-Konfiguration vorhanden - Bot ist einsatzbereit!</div>';
+                        } else {
+                            statusDiv.innerHTML = '<div class="alert alert-warning">⚠️ Keine SSH-Konfiguration - Bitte konfigurieren um den Bot zu starten</div>';
+                        }
+                    }
+                    
+                    // Auto-extract local port when SSH command changes
+                    if (sshCmdEl) {
+                        sshCmdEl.addEventListener('input', function() {
+                            const cmd = this.value;
+                            const match = cmd.match(/-L\s+(\d+):/);
+                            if (localPortEl) {
+                                localPortEl.textContent = match ? match[1] : 'Nicht erkannt';
+                            }
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Fehler beim Laden der SSH-Config:', err);
+                    showSshAlert('Fehler beim Laden der Konfiguration', 'error');
+                });
+        }
+
+        // SSH Config speichern
+        const sshForm = document.getElementById('sshConfigForm');
+        if (sshForm) {
+            sshForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const data = {
+                    ssh_command: document.getElementById('sshCommand').value.trim(),
+                    ssh_password: document.getElementById('sshPassword').value.trim()
+                };
+                
+                if (!data.ssh_command) {
+                    showSshAlert('SSH-Command ist erforderlich!', 'error');
+                    return;
+                }
+                
+                if (!data.ssh_command.includes('ssh') || !data.ssh_command.includes('-L')) {
+                    showSshAlert('Ungültiger SSH-Command! Bitte vollständigen Command eingeben.', 'error');
+                    return;
+                }
+                
+                fetch('/api/admin/ssh_config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success) {
+                        showSshAlert('✅ SSH-Konfiguration erfolgreich gespeichert!', 'success');
+                        loadSSHConfig();
+                    } else {
+                        showSshAlert('❌ Fehler: ' + (result.error || 'Unbekannter Fehler'), 'error');
+                    }
+                })
+                .catch(err => {
+                    showSshAlert('❌ Fehler beim Speichern: ' + err.message, 'error');
+                });
+            });
+        }
+
+        // SSH-Verbindung testen
+        function testSSH() {
+            const loadingEl = document.getElementById('loading');
+            const formEl = document.getElementById('sshConfigForm');
+            
+            if (loadingEl) loadingEl.style.display = 'block';
+            if (formEl) formEl.style.display = 'none';
+            
+            fetch('/api/admin/test_ssh', { method: 'POST' })
+            .then(r => r.json())
+            .then(result => {
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (formEl) formEl.style.display = 'block';
+                
+                if (result.success) {
+                    showSshAlert('✅ ' + result.message, 'success');
+                } else {
+                    showSshAlert('❌ ' + result.message, 'error');
+                }
+            })
+            .catch(err => {
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (formEl) formEl.style.display = 'block';
+                showSshAlert('❌ Fehler beim Testen: ' + err.message, 'error');
+            });
+        }
+        
+        
+        // === Initiales Laden & Intervalle ===
         
         // Initial laden
-        loadUsers();
-        loadModeRequests();
-        loadAuditLog();
-        loadMaintenanceStatus();
-        
-        // Auto-Refresh alle 5 Sekunden
-        setInterval(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
             loadModeRequests();
             loadAuditLog();
             loadMaintenanceStatus();
+            loadSSHConfig();
+        });
+        
+        // Auto-Refresh alle 5 Sekunden (nur für dynamische Daten)
+        setInterval(() => {
+            loadModeRequests();
+            loadAuditLog();
         }, 5000);
         
         // Modal schließen bei Klick außerhalb
         window.onclick = function(event) {
-            if (event.target.className === 'modal') {
+            if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
         }
     </script>
 </body>
 </html>
+
