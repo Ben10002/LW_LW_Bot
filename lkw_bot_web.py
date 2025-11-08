@@ -143,7 +143,7 @@ def load_ssh_config():
     return {
         'ssh_command': '',
         'ssh_password': '',
-        'local_adb_port': 5839,
+        'local_adb_port': 5839, # Standard-Fallback
         'last_updated': None
     }
 
@@ -182,10 +182,14 @@ def parse_ssh_command(ssh_command):
                 local_port = tunnel_info.split(':')[0]
                 remote_info = tunnel_info
         
+        if not local_port:
+             logger.warning("Konnte Local Port nicht aus SSH-Command extrahieren")
+             return None
+
         return {
             'user_host': user_host,
             'port': port,
-            'local_port': local_port,
+            'local_port': int(local_port),
             'remote_info': remote_info,
             'full_command': ssh_command
         }
@@ -288,7 +292,10 @@ def log_audit(username, action, details=""):
         logs = []
     else:
         with open(AUDIT_LOG_FILE, 'r') as f:
-            logs = json.load(f)
+            try:
+                logs = json.load(f)
+            except json.JSONDecodeError:
+                logs = []
     
     from datetime import datetime
     import pytz
@@ -364,6 +371,9 @@ class BotController:
         self.error_count = 0
         self.maintenance_mode = self.load_maintenance_mode()
         
+        # SSH-Konfiguration laden (NEU)
+        self.ssh_config = load_ssh_config()
+        
         # Statistiken
         self.trucks_processed = 0
         self.trucks_shared = 0
@@ -377,8 +387,11 @@ class BotController:
     def load_mode_change_requests(self):
         """Lade Mode-Change-Requests"""
         if os.path.exists(MODE_REQUESTS_FILE):
-            with open(MODE_REQUESTS_FILE, 'r') as f:
-                return json.load(f)
+            try:
+                with open(MODE_REQUESTS_FILE, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                return {}
         return {}
     
     def save_mode_change_requests(self):
@@ -445,9 +458,12 @@ class BotController:
     def load_maintenance_mode(self):
         """Lade Maintenance-Status"""
         if os.path.exists(MAINTENANCE_FILE):
-            with open(MAINTENANCE_FILE, 'r') as f:
-                data = json.load(f)
-                return data.get('enabled', False)
+            try:
+                with open(MAINTENANCE_FILE, 'r') as f:
+                    data = json.load(f)
+                    return data.get('enabled', False)
+            except json.JSONDecodeError:
+                return False
         return False
     
     def set_maintenance_mode(self, enabled):
@@ -503,128 +519,132 @@ class BotController:
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Stats: {e}")
     
+    # =========================================================================
+    # NEUE SSH/ADB FUNKTIONEN (V2 LOGIK)
+    # =========================================================================
+
     def setup_ssh_tunnel(self):
-        """Erstellt SSH-Tunnel zu VMOSCloud"""
-        try:
-            # Verwende die korrekten SSH-Daten aus der Original-Konfiguration
-            SSH_HOST_FULL = "10.0.4.206_1762383884162@103.237.100.130"
-            SSH_PORT_REAL = 1824
-            SSH_KEY_REAL = "j0343aTw718AKRn2XP018+mmc8PkBtBdLN7Pqg7c/eWZ/ZjtMGLTwsdjqmDMsuqd8cDIZKC0oYm0P4eCVLjeAQ=="
-            LOCAL_PORT = 9842
-            REMOTE_ADB_REAL = "adb-proxy:46795"
+        """Erstellt SSH-Tunnel basierend auf der ssh_config.json (V2 LOGIK)"""
+        self.ssh_config = load_ssh_config() # Lade die neuesten Daten
+        
+        ssh_command_str = self.ssh_config.get('ssh_command')
+        ssh_password = self.ssh_config.get('ssh_password') # Das ist dein "Connection Key"
+        local_port = self.ssh_config.get('local_adb_port')
+
+        if not ssh_command_str or not local_port:
+            logger.error("SSH-Command oder Local Port fehlt in ssh_config.json")
+            self.status = "SSH-Konfig fehlt"
+            self.adb_connected = False
+            return False
+        
+        # 1. Bestehenden Tunnel/Prozess beenden
+        self.close_ssh_tunnel()
+        
+        # 2. Kommando vorbereiten
+        cmd_parts = ssh_command_str.split()
+        
+        # 3. sshpass verwenden, falls Passwort/Key vorhanden ist
+        if ssh_password:
+            # Prüfe ob sshpass installiert ist
+            if subprocess.run(['which', 'sshpass'], capture_output=True).returncode != 0:
+                logger.error("="*50)
+                logger.error("FEHLER: 'sshpass' ist nicht installiert!")
+                logger.error("Bitte installieren: sudo apt-get update && sudo apt-get install -y sshpass")
+                logger.error("="*50)
+                self.status = "sshpass fehlt"
+                self.adb_connected = False
+                return False
             
-            # Prüfe ob Tunnel bereits läuft
-            result = subprocess.run(['pgrep', '-f', f':{LOCAL_PORT}:'], 
-                                  capture_output=True, text=True)
-            if result.stdout:
-                logger.info("SSH-Tunnel läuft bereits")
+            cmd = ['sshpass', '-p', ssh_password] + cmd_parts
+        else:
+            cmd = cmd_parts
+        
+        logger.info(f"Starte SSH-Tunnel auf Port {local_port}...")
+        
+        try:
+            # Starte den SSH-Prozess
+            # Wir entfernen '-Nf' (Hintergrund) um es besser zu steuern
+            cmd = [part for part in cmd if part not in ['-Nf', '-N', '-f']]
+            cmd.extend(['-N']) # Im Vordergrund, aber keine Shell
+            
+            self.ssh_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            # 5-10 Sekunden warten, bis Tunnel steht
+            logger.info("Warte 7 Sekunden auf SSH-Verbindungsaufbau...")
+            time.sleep(7) 
+            
+            # Prüfen, ob der Prozess noch läuft
+            poll = self.ssh_process.poll()
+            if poll is not None:
+                # Prozess ist abgestürzt
+                stderr_output = self.ssh_process.stderr.read()
+                logger.error(f"SSH-Tunnel konnte nicht gestartet werden. Fehler: {stderr_output}")
+                self.status = "SSH-Fehler"
+                self.adb_connected = False
+                return False
+            
+            # 4. ADB verbinden
+            logger.info(f"SSH-Tunnel aktiv. Verbinde ADB mit localhost:{local_port}...")
+            adb_cmd = ['adb', 'connect', f'localhost:{local_port}']
+            adb_result = subprocess.run(adb_cmd, capture_output=True, text=True, timeout=10)
+            
+            if 'connected' in adb_result.stdout.lower() or 'already' in adb_result.stdout.lower():
+                logger.info("ADB erfolgreich verbunden")
                 self.adb_connected = True
                 return True
-            
-            # Erstelle temporäre SSH-Key Datei wenn nötig
-            import tempfile
-            key_file = None
-            if SSH_KEY_REAL:
-                key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.key')
-                key_file.write(SSH_KEY_REAL)
-                key_file.close()
-                os.chmod(key_file.name, 0o600)
-            
-            # Starte SSH-Tunnel mit korrekten Parametern
-            cmd = [
-                'ssh',
-                '-oHostKeyAlgorithms=+ssh-rsa',
-                '-oStrictHostKeyChecking=no',
-                '-oServerAliveInterval=60',
-                '-oServerAliveCountMax=3',
-                '-oUserKnownHostsFile=/dev/null'
-            ]
-            
-            # Füge Key hinzu wenn vorhanden
-            if key_file:
-                cmd.extend(['-i', key_file.name])
-            
-            # Füge Host und Port-Forwarding hinzu
-            cmd.extend([
-                SSH_HOST_FULL,
-                '-p', str(SSH_PORT_REAL),
-                '-L', f'{LOCAL_PORT}:{REMOTE_ADB_REAL}',
-                '-Nf'
-            ])
-            
-            logger.info(f"Starte SSH-Tunnel mit: Host={SSH_HOST_FULL}, Port={SSH_PORT_REAL}")
-            
-            # Versuche SSH-Verbindung
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            # Kurz warten auf Verbindungsaufbau
-            time.sleep(3)
-            
-            # Prüfe ob Tunnel läuft
-            check = subprocess.run(['pgrep', '-f', f':{LOCAL_PORT}:'], 
-                                 capture_output=True, text=True)
-            if check.stdout:
-                # Verbinde ADB
-                adb_cmd = ['adb', 'connect', f'localhost:{LOCAL_PORT}']
-                adb_result = subprocess.run(adb_cmd, capture_output=True, text=True)
-                
-                if 'connected' in adb_result.stdout.lower() or 'already' in adb_result.stdout.lower():
-                    logger.info("ADB erfolgreich verbunden")
-                    self.adb_connected = True
-                    
-                    # Cleanup temp key file
-                    if key_file and os.path.exists(key_file.name):
-                        os.unlink(key_file.name)
-                    
-                    return True
-                else:
-                    logger.warning(f"ADB-Verbindung unsicher: {adb_result.stdout}")
-                    self.adb_connected = True  # Trotzdem versuchen
-                    return True
             else:
-                logger.error("SSH-Tunnel konnte nicht gestartet werden")
-                if result.stderr:
-                    logger.error(f"SSH-Fehler: {result.stderr}")
-                
-                # Cleanup temp key file
-                if key_file and os.path.exists(key_file.name):
-                    os.unlink(key_file.name)
-                    
+                logger.warning(f"ADB-Verbindung fehlgeschlagen: {adb_result.stdout}")
+                self.close_ssh_tunnel() # Tunnel wieder abbauen
+                self.adb_connected = False
                 return False
-                
-        except subprocess.TimeoutExpired:
-            logger.error("SSH-Verbindung Timeout")
-            return False
+
         except Exception as e:
-            logger.error(f"SSH-Tunnel-Fehler: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"Fehler beim Starten des SSH-Tunnels: {e}")
+            self.close_ssh_tunnel()
+            self.adb_connected = False
             return False
     
     def close_ssh_tunnel(self):
-        """Schließt SSH-Tunnel"""
+        """Schließt SSH-Tunnel und ADB-Verbindung (V2 LOGIK)"""
         try:
-            LOCAL_PORT = 9842  # Verwende den korrekten Port
+            # Lade Port aus Config, nimm Fallback
+            local_port = self.ssh_config.get('local_adb_port', 8583) 
             
             # Trenne ADB
-            subprocess.run(['adb', 'disconnect', f'localhost:{LOCAL_PORT}'])
+            logger.info(f"Trenne ADB von localhost:{local_port}")
+            subprocess.run(['adb', 'disconnect', f'localhost:{local_port}'], timeout=5, capture_output=True)
             
             # Beende SSH-Prozess
-            subprocess.run(['pkill', '-f', f':{LOCAL_PORT}:'])
-            logger.info("SSH-Tunnel geschlossen")
+            if self.ssh_process:
+                logger.info("Beende SSH-Tunnel-Prozess...")
+                self.ssh_process.terminate()
+                self.ssh_process.wait(timeout=5)
+                self.ssh_process = None
+            
+            # Sicherheitshalber: Kill alle Prozesse, die den Port nutzen
+            logger.info(f"Kille alle verbleibenden SSH-Prozesse auf Port {local_port}")
+            # Finde den Prozess genauer
+            pkill_cmd = f"pkill -f 'ssh.*{local_port}:adb-proxy'"
+            subprocess.run(pkill_cmd, shell=True, capture_output=True)
+
             self.adb_connected = False
+            logger.info("SSH-Tunnel und ADB sauber getrennt")
         except Exception as e:
             logger.error(f"Fehler beim Schließen des Tunnels: {e}")
     
     def make_screenshot(self, filename='screen.png'):
         """Erstellt Screenshot über ADB"""
         try:
-            LOCAL_PORT = 9842  # Verwende den korrekten Port
-            adb_device = f'localhost:{LOCAL_PORT}'
+            local_port = self.ssh_config.get('local_adb_port')
+            if not local_port:
+                logger.error("ADB-Port nicht konfiguriert")
+                return False
+                
+            adb_device = f'localhost:{local_port}'
             subprocess.run(['adb', '-s', adb_device, 'shell', 'screencap', '-p', f'/sdcard/{filename}'], 
-                         timeout=10)
+                         timeout=10, capture_output=True)
             subprocess.run(['adb', '-s', adb_device, 'pull', f'/sdcard/{filename}', filename], 
-                         timeout=10)
+                         timeout=10, capture_output=True)
             return os.path.exists(filename)
         except Exception as e:
             logger.error(f"Screenshot-Fehler: {e}")
@@ -633,9 +653,11 @@ class BotController:
     def click(self, x, y):
         """Klickt auf Koordinaten"""
         try:
-            LOCAL_PORT = 9842  # Verwende den korrekten Port
-            adb_device = f'localhost:{LOCAL_PORT}'
-            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)])
+            local_port = self.ssh_config.get('local_adb_port')
+            if not local_port: return False
+            
+            adb_device = f'localhost:{local_port}'
+            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)], capture_output=True)
             return True
         except Exception as e:
             logger.error(f"Klick-Fehler: {e}")
@@ -644,14 +666,20 @@ class BotController:
     def swipe(self, x1, y1, x2, y2, duration=500):
         """Swipe-Geste"""
         try:
-            LOCAL_PORT = 9842  # Verwende den korrekten Port
-            adb_device = f'localhost:{LOCAL_PORT}'
+            local_port = self.ssh_config.get('local_adb_port')
+            if not local_port: return False
+                
+            adb_device = f'localhost:{local_port}'
             subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'swipe', 
-                          str(x1), str(y1), str(x2), str(y2), str(duration)])
+                          str(x1), str(y1), str(x2), str(y2), str(duration)], capture_output=True)
             return True
         except Exception as e:
             logger.error(f"Swipe-Fehler: {e}")
             return False
+    
+    # =========================================================================
+    # ALTE FUNKTIONEN (AB HIER UNVERÄNDERT)
+    # =========================================================================
     
     def load_staerken(self):
         """Lädt bereits geteilte Stärken"""
@@ -680,28 +708,50 @@ class BotController:
             logger.error(f"Template-Datei '{TEMPLATE_FILE}' nicht gefunden!")
             return None
         
-        screenshot = cv2.imread(screenshot_path)
-        template = cv2.imread(TEMPLATE_FILE)
-        
-        result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-        
-        if max_val > 0.8:
-            h, w = template.shape[:2]
-            return (max_loc[0], max_loc[1], w, h)
+        try:
+            screenshot = cv2.imread(screenshot_path)
+            template = cv2.imread(TEMPLATE_FILE)
+            
+            if screenshot is None:
+                logger.error(f"Screenshot-Datei konnte nicht gelesen werden: {screenshot_path}")
+                return None
+            if template is None:
+                logger.error(f"Template-Datei konnte nicht gelesen werden: {TEMPLATE_FILE}")
+                return None
+
+            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            
+            if max_val > 0.8:
+                h, w = template.shape[:2]
+                return (max_loc[0], max_loc[1], w, h)
+        except Exception as e:
+            logger.error(f"Fehler bei find_template: {e}")
+            
         return None
     
     def extract_text_from_region(self, screenshot_path, x, y, w, h):
         """Extrahiert Text aus Region mit OCR"""
-        img = cv2.imread(screenshot_path)
-        region = img[y:y+h, x:x+w]
-        
-        # Verbesserung für OCR
-        gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-        
-        text = pytesseract.image_to_string(thresh, lang='deu+eng')
-        return text
+        try:
+            img = cv2.imread(screenshot_path)
+            if img is None: return ""
+            
+            # Stelle sicher, dass Region im Bild ist
+            y1, y2 = max(0, y), min(img.shape[0], y + h)
+            x1, x2 = max(0, x), min(img.shape[1], x + w)
+            region = img[y1:y2, x1:x2]
+            
+            if region.size == 0: return ""
+
+            # Verbesserung für OCR
+            gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+            
+            text = pytesseract.image_to_string(thresh, lang='deu+eng')
+            return text
+        except Exception as e:
+            logger.error(f"Fehler bei extract_text: {e}")
+            return ""
     
     def extract_truck_info(self):
         """Extrahiert LKW-Informationen aus Screenshot"""
@@ -761,6 +811,7 @@ class BotController:
         if not self.setup_ssh_tunnel():
             self.status = "SSH-Fehler"
             self.last_action = "SSH-Tunnel konnte nicht erstellt werden"
+            self.running = False # Stoppe sofort
             return
         
         self.status = "Läuft"
@@ -904,6 +955,8 @@ class BotController:
                 
             except Exception as e:
                 logger.error(f"Fehler in Bot-Schleife: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 self.last_action = f"Fehler: {str(e)[:50]}..."
                 self.error_count += 1
                 time.sleep(5)
@@ -1154,7 +1207,7 @@ def api_reset_stats():
     return jsonify({'success': True})
 
 
-# ================== SSH Configuration Routes (NEU!) ==================
+# ================== SSH Configuration Routes (KORRIGIERT!) ==================
 
 @app.route('/api/admin/ssh_config', methods=['GET', 'POST'])
 @login_required
@@ -1178,7 +1231,7 @@ def api_admin_ssh_config():
         if not parsed:
             return jsonify({'error': 'Ungültiger SSH-Command'}), 400
         
-        local_port = int(parsed.get('local_port', 5839))
+        local_port = parsed.get('local_port') # parse_ssh_command gibt jetzt int zurück
         
         # Speichere Konfiguration
         config = {
@@ -1193,9 +1246,10 @@ def api_admin_ssh_config():
             
             # Wenn Bot läuft, versuche Reconnect
             if bot.running:
-                bot.close_ssh_tunnel()
+                logger.info("Bot läuft, starte SSH-Tunnel neu...")
+                bot.close_ssh_tunnel() # KORRIGIERT
                 time.sleep(1)
-                bot.setup_ssh_tunnel()
+                bot.setup_ssh_tunnel() # KORRIGIERT
             
             log_audit(current_user.username, 'Update SSH Config', 'SSH-Konfiguration aktualisiert')
             return jsonify({'success': True, 'message': 'SSH-Konfiguration gespeichert'})
@@ -1221,11 +1275,11 @@ def api_admin_test_ssh():
     
     try:
         # Trenne bestehende Verbindung
-        bot.close_ssh_tunnel()
+        bot.close_ssh_tunnel() # KORRIGIERT
         time.sleep(1)
         
         # Versuche neue Verbindung
-        if bot.setup_ssh_tunnel():
+        if bot.setup_ssh_tunnel(): # KORRIGIERT
             return jsonify({
                 'success': True,
                 'message': 'SSH-Tunnel und ADB erfolgreich verbunden'
@@ -1357,26 +1411,30 @@ def api_admin_stats():
     
     # Filter nach Zeitbereich wenn angegeben
     filtered_stats = []
-    for stat in all_stats:
-        try:
-            stat_time = datetime.fromisoformat(stat['timestamp'].replace('Z', '+00:00'))
-            include = True
-            
-            if start_str:
-                start_time = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-                if stat_time < start_time:
-                    include = False
-            
-            if end_str:
-                end_time = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-                if stat_time > end_time:
-                    include = False
-            
-            if include:
-                filtered_stats.append(stat)
-        except Exception as e:
-            logger.error(f"Fehler beim Filtern der Statistik: {e}")
-            continue
+    if not start_str and not end_str:
+        filtered_stats = all_stats
+    else:
+        for stat in all_stats:
+            try:
+                # Mache Zeitzonen-naive Vergleiche, falls Inputs keine TZ haben
+                stat_time = datetime.fromisoformat(stat['timestamp']).replace(tzinfo=None)
+                include = True
+                
+                if start_str:
+                    start_time = datetime.fromisoformat(start_str).replace(tzinfo=None)
+                    if stat_time < start_time:
+                        include = False
+                
+                if end_str:
+                    end_time = datetime.fromisoformat(end_str).replace(tzinfo=None)
+                    if stat_time > end_time:
+                        include = False
+                
+                if include:
+                    filtered_stats.append(stat)
+            except Exception as e:
+                logger.warning(f"Fehler beim Filtern der Statistik-Zeit: {e} (Wert: {stat.get('timestamp')})")
+                continue
     
     return jsonify({'trucks': filtered_stats})
 
@@ -1388,7 +1446,10 @@ def api_admin_audit_log():
     
     if os.path.exists(AUDIT_LOG_FILE):
         with open(AUDIT_LOG_FILE, 'r') as f:
-            logs = json.load(f)
+            try:
+                logs = json.load(f)
+            except json.JSONDecodeError:
+                logs = []
     else:
         logs = []
     
@@ -1426,7 +1487,7 @@ if __name__ == '__main__':
         logger.info(f"Letzte Aktualisierung: {ssh_config.get('last_updated', 'Unbekannt')}")
     else:
         logger.warning("⚠️  KEINE SSH-KONFIGURATION VORHANDEN!")
-        logger.warning("Bitte im Admin-Panel konfigurieren: http://localhost:5000/admin")
+        logger.warning("Bitte im Admin-Panel konfigurieren: http://<deine-ip>:5000/admin")
     
     # Starte Flask
     logger.info("Starte LKW-Bot Web-Interface v2.1...")
