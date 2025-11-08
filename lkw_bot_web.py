@@ -1193,9 +1193,9 @@ def api_admin_ssh_config():
             
             # Wenn Bot läuft, versuche Reconnect
             if bot.running:
-                bot.close_ssh_tunnel()  # KORRIGIERT
+                bot.close_ssh_tunnel()
                 time.sleep(1)
-                bot.setup_ssh_tunnel()  # KORRIGIERT
+                bot.setup_ssh_tunnel()
             
             log_audit(current_user.username, 'Update SSH Config', 'SSH-Konfiguration aktualisiert')
             return jsonify({'success': True, 'message': 'SSH-Konfiguration gespeichert'})
@@ -1221,11 +1221,11 @@ def api_admin_test_ssh():
     
     try:
         # Trenne bestehende Verbindung
-        bot.close_ssh_tunnel()  # KORRIGIERT
+        bot.close_ssh_tunnel()
         time.sleep(1)
         
         # Versuche neue Verbindung
-        if bot.setup_ssh_tunnel():  # KORRIGIERT
+        if bot.setup_ssh_tunnel():
             return jsonify({
                 'success': True,
                 'message': 'SSH-Tunnel und ADB erfolgreich verbunden'
@@ -1384,4 +1384,50 @@ def api_admin_stats():
 @login_required
 def api_admin_audit_log():
     if current_user.role != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 4
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if os.path.exists(AUDIT_LOG_FILE):
+        with open(AUDIT_LOG_FILE, 'r') as f:
+            logs = json.load(f)
+    else:
+        logs = []
+    
+    # Nur letzte 100 Einträge
+    return jsonify({'logs': logs[-100:]})
+
+@app.route('/api/admin/maintenance', methods=['POST'])
+@login_required
+def api_admin_maintenance():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.json
+    enabled = data.get('enabled', False)
+    bot.set_maintenance_mode(enabled)
+    log_audit(current_user.username, 'Set Maintenance Mode', str(enabled))
+    
+    return jsonify({'success': True})
+
+@app.route('/stats')
+@login_required
+def stats_page():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    return render_template('stats.html', user=current_user)
+
+if __name__ == '__main__':
+    # Initialisiere Users
+    init_users()
+    
+    # Lade SSH-Konfiguration und gib Info aus
+    ssh_config = load_ssh_config()
+    if ssh_config.get('ssh_command'):
+        logger.info("SSH-Konfiguration geladen")
+        logger.info(f"Letzte Aktualisierung: {ssh_config.get('last_updated', 'Unbekannt')}")
+    else:
+        logger.warning("⚠️  KEINE SSH-KONFIGURATION VORHANDEN!")
+        logger.warning("Bitte im Admin-Panel konfigurieren: http://localhost:5000/admin")
+    
+    # Starte Flask
+    logger.info("Starte LKW-Bot Web-Interface v2.1...")
+    app.run(host='0.0.0.0', port=5000, debug=False)
