@@ -3,7 +3,7 @@
 """
 LKW-Bot für Last War mit Web-Interface
 Optimiert für Raspberry Pi und VMOSCloud über SSH-Tunnel
-Version 2.1 - Mit SSH-Konfiguration im Admin-Panel
+Version 2.2 - V2-SSH-Logik mit V1-Spiellogik/Koordinaten fusioniert
 """
 
 import subprocess
@@ -97,6 +97,8 @@ TRANSLATIONS = {
         'filter_server': 'Filter server',
         'server_number': 'Server number',
         'reset_interval': 'Reset interval (minutes)',
+        'use_timer': 'Use timer',
+        'timer_minutes': 'Runtime (minutes)',
         'share_mode': 'Share in',
         'share_world': 'World Chat',
         'share_alliance': 'A4O',
@@ -116,8 +118,6 @@ TRANSLATIONS = {
         'confirm_reset': 'Really reset statistics?',
         'language': 'Language',
         'admin_dashboard': 'Admin',
-        'use_timer': 'Use timer',
-        'timer_minutes': 'Runtime (minutes)',
         'timer_remaining': 'Time remaining',
         'request_mode_change': 'Request mode change',
         'mode_change_requested': 'Mode change requested',
@@ -128,7 +128,7 @@ TRANSLATIONS = {
 }
 
 
-# ================== SSH Konfiguration (NEU!) ==================
+# ================== SSH Konfiguration (V2) ==================
 
 def load_ssh_config():
     """Lade SSH-Konfiguration aus Datei"""
@@ -165,7 +165,6 @@ def parse_ssh_command(ssh_command):
         # Beispiel: ssh -oHostKeyAlgorithms=+ssh-rsa 10.0.4.206_1762615280757@103.237.100.130 -p 1824 -L 8583:adb-proxy:50438 -Nf
         parts = ssh_command.split()
         
-        # Finde den User@Host Teil
         user_host = None
         port = None
         local_port = None
@@ -177,7 +176,6 @@ def parse_ssh_command(ssh_command):
             elif part == '-p' and i + 1 < len(parts):
                 port = parts[i + 1]
             elif part == '-L' and i + 1 < len(parts):
-                # Format: local_port:remote_host:remote_port
                 tunnel_info = parts[i + 1]
                 local_port = tunnel_info.split(':')[0]
                 remote_info = tunnel_info
@@ -196,10 +194,6 @@ def parse_ssh_command(ssh_command):
     except Exception as e:
         logger.error(f"Fehler beim Parsen des SSH-Commands: {e}")
         return None
-
-# ================== SSH/ADB Konfiguration ==================
-# HINWEIS: SSH-Konfiguration erfolgt jetzt über Admin-Panel!
-# Keine hartcodierten Werte mehr nötig - alles wird in ssh_config.json gespeichert
 
 # ================== Flask Setup ==================
 
@@ -222,18 +216,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ================== Dateipfade ==================
+# ================== Dateipfade & SPIEL-KONFIGURATION (V1-Logik) ==================
 
-TEMPLATE_FILE = 'rentier_template.png'
-STAERKEN_FILE = 'lkw_staerken.txt'
+TEMPLATE_FILE = 'rentier_template.png' # Name der Template-Datei
+STAERKEN_FILE = 'lkw_staerken.txt'     # Datei für bereits geteilte Stärken
 USERS_FILE = 'users.json'
 AUDIT_LOG_FILE = 'audit_log.json'
 MAINTENANCE_FILE = 'maintenance.json'
-STATS_FILE = 'truck_stats.json'
+STATS_FILE = 'truck_stats.json'        # Datei für Statistiken (ersetzt truck_data.json)
 MODE_REQUESTS_FILE = 'mode_requests.json'
-SSH_CONFIG_FILE = 'ssh_config.json'  # NEU: SSH-Konfiguration
+SSH_CONFIG_FILE = 'ssh_config.json'
 
-# ================== User System ==================
+# Klick-Koordinaten (aus altem Skript)
+COORDS_NEW = {
+    'esc': (680, 70),           # ESC-Button oben rechts
+    'share': (450, 1100),       # Teilen-Button
+    'share_confirm1': (300, 450), # Bestätigung 1 - Weltchat
+    'share_confirm2': (400, 750), # Bestätigung 2 - Weltchat
+}
+
+# Koordinaten für Allianz-Chat (aus altem Skript)
+COORDS_ALLIANCE = {
+    'esc': (680, 70),           # ESC-Button (gleich)
+    'share': (450, 1100),       # Teilen-Button (gleich)
+    'share_confirm1': (300, 700), # Bestätigung 1 - Allianz-Chat
+    'share_confirm2': (400, 750), # Bestätigung 2 - Allianz-Chat (gleich)
+}
+
+# OCR-Boxen (aus altem Skript)
+STAERKE_BOX = (200, 950, 300, 1000)   # Stärke-Bereich (links, oben, rechts, unten)
+SERVER_BOX = (160, 860, 220, 915)    # Server-Bereich (links, oben, rechts, unten)
+
+
+# ================== User System (V2-Logik) ==================
 
 class User(UserMixin):
     def __init__(self, username, password, role='user', blocked=False, can_choose_share_mode=True, forced_share_mode=None):
@@ -335,7 +350,7 @@ def load_user(username):
 # Initialisiere Users beim Start
 init_users()
 
-# ================== Bot-Steuerung ==================
+# ================== Bot-Steuerung (V2-Basis) ==================
 
 class BotController:
     def __init__(self):
@@ -371,7 +386,7 @@ class BotController:
         self.error_count = 0
         self.maintenance_mode = self.load_maintenance_mode()
         
-        # SSH-Konfiguration laden (NEU)
+        # SSH-Konfiguration laden
         self.ssh_config = load_ssh_config()
         
         # Statistiken
@@ -421,7 +436,6 @@ class BotController:
                 req['status'] = 'approved'
                 self.save_mode_change_requests()
                 
-                # Wenn dieser User gerade den Bot nutzt, aktualisiere den Modus
                 if self.current_user == username:
                     self.share_mode = req['requested_mode']
                 
@@ -499,7 +513,6 @@ class BotController:
                 logger.error(f"Korrupte Stats-Datei, erstelle neue")
                 stats = []
         
-        # Deutsche Zeit für Timestamp
         tz = pytz.timezone('Europe/Berlin')
         timestamp = datetime.now(tz).isoformat()
         
@@ -510,14 +523,21 @@ class BotController:
             'user': self.current_user
         })
         
-        # Behalte nur letzte 1000 Einträge
-        stats = stats[-1000:]
+        # Nur letzte 30 Tage behalten (Logik aus altem Skript übernommen)
+        cutoff = datetime.now(tz) - timedelta(days=30)
+        stats = [s for s in stats if datetime.fromisoformat(s['timestamp']) > cutoff]
         
         try:
             with open(STATS_FILE, 'w') as f:
                 json.dump(stats, f, indent=2)
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Stats: {e}")
+
+        # Erfolgreich -> Reset Timer (Logik aus altem Skript)
+        self.last_success_time = time.time()
+        if self.maintenance_mode:
+            logger.info("LKW gefunden - deaktiviere Maintenance-Mode")
+            self.set_maintenance_mode(False)
     
     # =========================================================================
     # NEUE SSH/ADB FUNKTIONEN (V2 LOGIK)
@@ -537,15 +557,11 @@ class BotController:
             self.adb_connected = False
             return False
         
-        # 1. Bestehenden Tunnel/Prozess beenden
         self.close_ssh_tunnel()
         
-        # 2. Kommando vorbereiten
         cmd_parts = ssh_command_str.split()
         
-        # 3. sshpass verwenden, falls Passwort/Key vorhanden ist
         if ssh_password:
-            # Prüfe ob sshpass installiert ist
             if subprocess.run(['which', 'sshpass'], capture_output=True).returncode != 0:
                 logger.error("="*50)
                 logger.error("FEHLER: 'sshpass' ist nicht installiert!")
@@ -562,28 +578,22 @@ class BotController:
         logger.info(f"Starte SSH-Tunnel auf Port {local_port}...")
         
         try:
-            # Starte den SSH-Prozess
-            # Wir entfernen '-Nf' (Hintergrund) um es besser zu steuern
             cmd = [part for part in cmd if part not in ['-Nf', '-N', '-f']]
-            cmd.extend(['-N']) # Im Vordergrund, aber keine Shell
+            cmd.extend(['-N']) 
             
             self.ssh_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             
-            # 5-10 Sekunden warten, bis Tunnel steht
             logger.info("Warte 7 Sekunden auf SSH-Verbindungsaufbau...")
             time.sleep(7) 
             
-            # Prüfen, ob der Prozess noch läuft
             poll = self.ssh_process.poll()
             if poll is not None:
-                # Prozess ist abgestürzt
                 stderr_output = self.ssh_process.stderr.read()
                 logger.error(f"SSH-Tunnel konnte nicht gestartet werden. Fehler: {stderr_output}")
                 self.status = "SSH-Fehler"
                 self.adb_connected = False
                 return False
             
-            # 4. ADB verbinden
             logger.info(f"SSH-Tunnel aktiv. Verbinde ADB mit localhost:{local_port}...")
             adb_cmd = ['adb', 'connect', f'localhost:{local_port}']
             adb_result = subprocess.run(adb_cmd, capture_output=True, text=True, timeout=10)
@@ -594,7 +604,7 @@ class BotController:
                 return True
             else:
                 logger.warning(f"ADB-Verbindung fehlgeschlagen: {adb_result.stdout}")
-                self.close_ssh_tunnel() # Tunnel wieder abbauen
+                self.close_ssh_tunnel() 
                 self.adb_connected = False
                 return False
 
@@ -607,23 +617,18 @@ class BotController:
     def close_ssh_tunnel(self):
         """Schließt SSH-Tunnel und ADB-Verbindung (V2 LOGIK)"""
         try:
-            # Lade Port aus Config, nimm Fallback
             local_port = self.ssh_config.get('local_adb_port', 8583) 
             
-            # Trenne ADB
             logger.info(f"Trenne ADB von localhost:{local_port}")
             subprocess.run(['adb', 'disconnect', f'localhost:{local_port}'], timeout=5, capture_output=True)
             
-            # Beende SSH-Prozess
             if self.ssh_process:
                 logger.info("Beende SSH-Tunnel-Prozess...")
                 self.ssh_process.terminate()
                 self.ssh_process.wait(timeout=5)
                 self.ssh_process = None
             
-            # Sicherheitshalber: Kill alle Prozesse, die den Port nutzen
             logger.info(f"Kille alle verbleibenden SSH-Prozesse auf Port {local_port}")
-            # Finde den Prozess genauer
             pkill_cmd = f"pkill -f 'ssh.*{local_port}:adb-proxy'"
             subprocess.run(pkill_cmd, shell=True, capture_output=True)
 
@@ -633,7 +638,7 @@ class BotController:
             logger.error(f"Fehler beim Schließen des Tunnels: {e}")
     
     def make_screenshot(self, filename='screen.png'):
-        """Erstellt Screenshot über ADB"""
+        """Erstellt Screenshot über ADB (V2-Logik)"""
         try:
             local_port = self.ssh_config.get('local_adb_port')
             if not local_port:
@@ -651,20 +656,24 @@ class BotController:
             return False
     
     def click(self, x, y):
-        """Klickt auf Koordinaten"""
+        """Klickt auf Koordinaten (V2-Logik)"""
         try:
             local_port = self.ssh_config.get('local_adb_port')
             if not local_port: return False
             
             adb_device = f'localhost:{local_port}'
-            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)], capture_output=True)
+            # Klick-Logging aus alter Logik übernommen
+            logger.info(f"Klicke auf ({x}, {y})")
+            subprocess.run(['adb', '-s', adb_device, 'shell', 'input', 'tap', str(x), str(y)], capture_output=True, timeout=5)
+            # Sleep aus alter Logik übernommen
+            time.sleep(2)
             return True
         except Exception as e:
             logger.error(f"Klick-Fehler: {e}")
             return False
     
     def swipe(self, x1, y1, x2, y2, duration=500):
-        """Swipe-Geste"""
+        """Swipe-Geste (V2-Logik)"""
         try:
             local_port = self.ssh_config.get('local_adb_port')
             if not local_port: return False
@@ -678,296 +687,284 @@ class BotController:
             return False
     
     # =========================================================================
-    # ALTE FUNKTIONEN (AB HIER UNVERÄNDERT)
+    # SPIEL-FUNKTIONEN (Logik aus V1-Skript)
     # =========================================================================
     
+    def ocr_staerke(self):
+        """Liest Stärke per OCR"""
+        try:
+            img = Image.open('info.png')
+            staerke_img = img.crop(STAERKE_BOX)
+            staerke_img.save('staerke_ocr.png')
+            
+            configs = [
+                '--psm 7',  # Single text line
+                '--psm 8',  # Single word
+                '--psm 6',  # Uniform block of text
+            ]
+            
+            for config in configs:
+                wert = pytesseract.image_to_string(staerke_img, lang='eng', config=config).strip()
+                if wert and ('m' in wert.lower() or 'M' in wert):
+                    logger.info(f"OCR Stärke: {wert}")
+                    return wert
+            
+            logger.warning("OCR konnte keine Stärke finden")
+            return ""
+        except Exception as e:
+            logger.error(f"OCR-Fehler: {e}")
+            return ""
+
+    def ocr_server(self):
+        """Liest Server-Text per OCR (Hilfsfunktion für Stats)"""
+        try:
+            img = Image.open('info.png')
+            server_img = img.crop(SERVER_BOX)
+            server_text = pytesseract.image_to_string(server_img, lang='eng').strip()
+            logger.info(f"OCR Server: '{server_text}'")
+            
+            s_txt = re.sub(r'[^0-9]', '', server_text) # Nur Ziffern behalten
+            return s_txt if s_txt else "Unknown"
+        except Exception as e:
+            logger.error(f"Server-OCR-Fehler: {e}")
+            return "Unknown"
+
+    def ist_server_passend(self):
+        """Prüft ob Server passt"""
+        try:
+            img = Image.open('info.png')
+            server_img = img.crop(SERVER_BOX)
+            server_img.save('server_ocr.png')
+            server_text = pytesseract.image_to_string(server_img, lang='eng').strip()
+            logger.info(f"OCR Server: '{server_text}'")
+            
+            s_txt = server_text.replace(' ', '').replace('O', '0')
+            return (f"#{self.server_number}" in s_txt) or (self.server_number in s_txt)
+        except Exception as e:
+            logger.error(f"Server-Check-Fehler: {e}")
+            return False
+
+    def rentier_lkw_finden(self):
+        """Findet Rentier-LKW per Template-Matching"""
+        try:
+            screenshot = cv2.imread('screen.png')
+            template = cv2.imread(TEMPLATE_FILE) # TEMPLATE_FILE ist 'rentier_template.png'
+            
+            if screenshot is None:
+                logger.error("Screenshot-Datei 'screen.png' konnte nicht gelesen werden")
+                return None
+            if template is None:
+                logger.error(f"Template-Datei '{TEMPLATE_FILE}' konnte nicht gelesen werden")
+                return None
+                
+            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+            locations = np.where(result >= 0.40) # Threshold aus V1-Skript
+            matches = [(int(pt[0]), int(pt[1])) for pt in zip(*locations[::-1])]
+            
+            return matches if matches else None
+        except Exception as e:
+            logger.error(f"Template-Matching-Fehler: {e}")
+            return None
+
+    def staerke_float_wert(self, staerke_text):
+        """Extrahiert numerischen Wert aus Stärke-Text und korrigiert fehlendes Komma"""
+        match = re.search(r"([\d\.,]+)\s*[mM]", staerke_text)
+        if match:
+            try:
+                zahl_str = match.group(1).replace(',', '.')
+                zahl = float(zahl_str)
+                
+                # Automatische Komma-Korrektur (Logik aus V1-Skript)
+                if zahl >= 100 and '.' not in match.group(1) and ',' not in match.group(1):
+                    zahl = zahl / 10
+                    logger.info(f"Komma-Korrektur: {match.group(1)}M → {zahl}M")
+                
+                return zahl
+            except ValueError:
+                return None
+        return None
+
     def load_staerken(self):
-        """Lädt bereits geteilte Stärken"""
+        """Lädt bereits geteilte Stärken (V2-Funktion, V1-Logik)"""
         if os.path.exists(STAERKEN_FILE):
-            with open(STAERKEN_FILE, 'r') as f:
-                return f.read().splitlines()
+            try:
+                with open(STAERKEN_FILE, 'r', encoding="utf-8") as f:
+                    return f.read().splitlines()
+            except Exception as e:
+                logger.error(f"Fehler beim Laden der Stärken: {e}")
+                return []
         return []
     
     def save_staerke(self, staerke):
-        """Speichert geteilte Stärke"""
-        staerken = self.load_staerken()
-        if staerke not in staerken:
-            staerken.append(staerke)
-            with open(STAERKEN_FILE, 'w') as f:
-                f.write('\n'.join(staerken))
+        """Speichert geteilte Stärke (V2-Funktion, V1-Logik)"""
+        try:
+            with open(STAERKEN_FILE, "a", encoding="utf-8") as f:
+                f.write(staerke + "\n")
+            logger.info(f"Stärke {staerke} notiert")
+        except Exception as e:
+            logger.error(f"Fehler beim Notieren der Stärke: {e}")
     
     def reset_staerken(self):
-        """Setzt die Stärken-Liste zurück"""
-        if os.path.exists(STAERKEN_FILE):
-            os.remove(STAERKEN_FILE)
-        logger.info("Stärken-Liste zurückgesetzt")
-    
-    def find_template(self, screenshot_path):
-        """Sucht nach Template im Screenshot"""
-        if not os.path.exists(TEMPLATE_FILE):
-            logger.error(f"Template-Datei '{TEMPLATE_FILE}' nicht gefunden!")
-            return None
-        
+        """Setzt die Stärken-Liste zurück (V2-Funktion, V1-Logik)"""
         try:
-            screenshot = cv2.imread(screenshot_path)
-            template = cv2.imread(TEMPLATE_FILE)
-            
-            if screenshot is None:
-                logger.error(f"Screenshot-Datei konnte nicht gelesen werden: {screenshot_path}")
-                return None
-            if template is None:
-                logger.error(f"Template-Datei konnte nicht gelesen werden: {TEMPLATE_FILE}")
-                return None
-
-            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-            
-            if max_val > 0.8:
-                h, w = template.shape[:2]
-                return (max_loc[0], max_loc[1], w, h)
+            with open(STAERKEN_FILE, "w", encoding="utf-8") as f:
+                f.write("")
+            logger.info("Stärken-Liste zurückgesetzt")
         except Exception as e:
-            logger.error(f"Fehler bei find_template: {e}")
-            
-        return None
-    
-    def extract_text_from_region(self, screenshot_path, x, y, w, h):
-        """Extrahiert Text aus Region mit OCR"""
-        try:
-            img = cv2.imread(screenshot_path)
-            if img is None: return ""
-            
-            # Stelle sicher, dass Region im Bild ist
-            y1, y2 = max(0, y), min(img.shape[0], y + h)
-            x1, x2 = max(0, x), min(img.shape[1], x + w)
-            region = img[y1:y2, x1:x2]
-            
-            if region.size == 0: return ""
+            logger.error(f"Reset-Fehler: {e}")
 
-            # Verbesserung für OCR
-            gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-            
-            text = pytesseract.image_to_string(thresh, lang='deu+eng')
-            return text
-        except Exception as e:
-            logger.error(f"Fehler bei extract_text: {e}")
-            return ""
-    
-    def extract_truck_info(self):
-        """Extrahiert LKW-Informationen aus Screenshot"""
-        if not self.make_screenshot():
-            return None
-        
-        location = self.find_template('screen.png')
-        if not location:
-            return None
-        
-        x, y, w, h = location
-        
-        # OCR für Stärke (rechts vom Template)
-        strength_text = self.extract_text_from_region('screen.png', x+w, y, 150, h)
-        strength_match = re.search(r'(\d+[,.]?\d*)\s*M', strength_text)
-        
-        # OCR für Server (über dem Template)
-        server_text = self.extract_text_from_region('screen.png', x, y-50, w+150, 50)
-        server_match = re.search(r'Server\s*(\d+)', server_text)
-        
-        if strength_match:
-            strength = strength_match.group(1).replace(',', '.')
-            server = server_match.group(1) if server_match else "?"
-            
-            return {
-                'strength': float(strength),
-                'server': server,
-                'coords': (x + w//2, y + h//2)
-            }
-        return None
-    
-    def share_truck(self):
-        """Teilt einen LKW"""
-        # Klick auf Teilen-Button
-        self.click(540, 1500)  # Anpassbar je nach Auflösung
-        time.sleep(2)
-        
-        # Wähle Chat-Typ basierend auf share_mode
-        if self.share_mode == 'alliance':
-            # A4O Chat
-            self.click(300, 800)
-        else:
-            # Weltchat
-            self.click(500, 800)
-        
-        time.sleep(1)
-        
-        # Bestätigen
-        self.click(540, 1200)
-        time.sleep(2)
+    # =========================================================================
+    # BOT-HAUPTSCHLEIFE (V1-Spiellogik fusioniert mit V2-Funktionen)
+    # =========================================================================
     
     def bot_loop(self):
-        """Haupt-Bot-Schleife"""
+        """Hauptschleife des Bots (LOGIK AUS ALTEM SKRIPT)"""
         logger.info("Bot-Schleife gestartet")
         
-        # SSH-Tunnel einrichten
+        # Setup SSH-Tunnel (V2-Funktion)
         if not self.setup_ssh_tunnel():
-            self.status = "SSH-Fehler"
-            self.last_action = "SSH-Tunnel konnte nicht erstellt werden"
-            self.running = False # Stoppe sofort
+            self.status = "Fehler: SSH-Tunnel konnte nicht aufgebaut werden"
+            self.running = False
             return
         
-        self.status = "Läuft"
-        self.last_action = "Bot gestartet - Suche nach LKWs..."
+        # Reset-Timer starten (V2-Funktion)
+        reset_thread = threading.Thread(target=self.reset_timer, daemon=True)
+        reset_thread.start()
         
-        # Timer-Thread starten wenn aktiviert
+        # Auto-Stop Timer starten (V2-Logik)
         if self.use_timer:
             self.timer_start_time = time.time()
             self.timer_thread = threading.Thread(target=self.check_timer, daemon=True)
             self.timer_thread.start()
-            logger.info(f"Timer gestartet für {self.timer_duration_minutes} Minuten")
-        
-        # Starte Reset-Timer
-        reset_thread = threading.Thread(target=self.reset_timer, daemon=True)
-        reset_thread.start()
-        
-        # Deutsche Zeitzone
-        tz = pytz.timezone('Europe/Berlin')
-        no_truck_counter = 0
+            logger.info(f"Auto-Stop Timer gestartet für {self.timer_duration_minutes} Minuten")
         
         while self.running:
-            # Pausieren wenn nötig
             if self.paused:
                 self.status = "Pausiert"
                 time.sleep(1)
                 continue
             
-            # Maintenance-Mode
+            # Maintenance-Mode Check (V2-Logik)
             if self.maintenance_mode:
                 self.status = "Maintenance-Mode"
                 self.last_action = "Wartungsarbeiten - Bot pausiert"
                 time.sleep(10)
                 continue
-            
+
             try:
-                # Screenshot machen
-                self.status = "Läuft - Erstelle Screenshot..."
-                if not self.make_screenshot():
-                    self.last_action = "Screenshot fehlgeschlagen - Retry in 5s"
-                    logger.error("Screenshot fehlgeschlagen")
+                self.status = "Läuft - Suche LKWs..."
+                self.last_action = "Screenshot erstellen"
+                
+                if not self.make_screenshot('screen.png'): # V2-Funktion
+                    self.last_action = "Fehler: Screenshot fehlgeschlagen"
                     time.sleep(5)
                     continue
                 
-                # Nach Truck-Template suchen
-                self.status = "Läuft - Suche LKWs..."
-                truck_info = self.extract_truck_info()
+                time.sleep(0.5)
+                treffer = self.rentier_lkw_finden() # Alte Logik-Funktion
                 
-                if truck_info:
-                    no_truck_counter = 0  # Reset counter
+                if not treffer:
+                    self.last_action = "Kein LKW gefunden - ESC"
+                    self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1]) # V2-Funktion, Alte Coords
                     self.trucks_processed += 1
-                    strength_str = f"{truck_info['strength']:.1f}M"
-                    server_str = truck_info['server']
-                    
-                    logger.info(f"LKW gefunden: {server_str}/{strength_str}")
-                    
-                    # Log Statistik
-                    self.log_truck_stat(strength_str, server_str)
-                    
-                    # Prüfe Filter
-                    skip = False
-                    skip_reason = ""
-                    
-                    # Stärke-Filter
-                    if self.use_limit and truck_info['strength'] > self.strength_limit:
-                        skip = True
-                        skip_reason = f"zu stark ({strength_str} > {self.strength_limit}M)"
-                    
-                    # Server-Filter
-                    if self.use_server_filter and server_str != self.server_number:
-                        skip = True
-                        skip_reason = f"falscher Server ({server_str} != {self.server_number})"
-                    
-                    # Bereits geteilt?
-                    truck_id = f"{server_str}/{strength_str}"
-                    if truck_id in self.load_staerken():
-                        skip = True
-                        skip_reason = "bereits geteilt"
-                    
-                    if skip:
+                    continue
+                
+                self.last_action = f"LKW gefunden bei {treffer[0]}"
+                logger.info(f"Treffer bei: {treffer[0]}")
+                
+                # Klicke auf LKW (mit Offset)
+                lx = treffer[0][0] + 5  # Angepasster Offset für kleineren Screen
+                ly = treffer[0][1] + 5
+                self.click(lx, ly) # V2-Funktion
+                
+                if not self.make_screenshot('info.png'): # V2-Funktion
+                    self.last_action = "Fehler: Info-Screenshot fehlgeschlagen"
+                    continue
+                
+                # Server-Check
+                if self.use_server_filter:
+                    self.last_action = "Prüfe Server..."
+                    if not self.ist_server_passend(): # Alte Logik-Funktion
+                        self.last_action = f"Falscher Server - ESC"
+                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1]) # V2-Funktion
                         self.trucks_skipped += 1
-                        self.last_action = f"LKW {truck_id} übersprungen: {skip_reason}"
-                        logger.info(self.last_action)
-                        
-                        # Klick irgendwo um weiterzugehen
-                        self.click(100, 100)
-                        time.sleep(2)
+                        self.trucks_processed += 1
+                        continue
+                
+                # Stärke auslesen
+                self.last_action = "Lese Stärke..."
+                staerke = self.ocr_staerke() # Alte Logik-Funktion
+                wert = self.staerke_float_wert(staerke) # Alte Logik-Funktion
+                logger.info(f"Stärke gelesen: '{staerke}' Wert: {wert}")
+                
+                # Stärke-Check
+                limit_passed = True
+                if self.use_limit and wert is not None:
+                    if wert > self.strength_limit:
+                        limit_passed = False
+                        self.last_action = f"Stärke {wert} > {self.strength_limit} - übersprungen"
+                
+                # Prüfe auf None, Limit ODER ob Stärke bekannt ist
+                if wert is None or not limit_passed or (staerke in self.load_staerken()):
+                    if wert is None:
+                        self.last_action = "Keine Stärke erkannt - Lade Liste neu"
+                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
+                        time.sleep(0.5)
+                        # Zweiter ESC zum Neuladen der LKW-Liste
+                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
+                    elif not limit_passed:
+                        self.last_action = f"Stärke {wert} > {self.strength_limit} - übersprungen"
+                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
                     else:
-                        # Klicke auf Truck-Position um Details zu öffnen
-                        self.status = "Läuft - Öffne LKW Details..."
-                        x, y = truck_info['coords']
-                        self.click(x, y)
-                        time.sleep(2)
-                        
-                        # Teile LKW
-                        self.status = f"Läuft - Teile LKW im {self.share_mode}..."
-                        self.share_truck()
-                        self.save_staerke(truck_id)
-                        self.trucks_shared += 1
-                        
-                        zeit = datetime.now(tz).strftime('%H:%M:%S')
-                        self.last_action = f"[{zeit}] LKW {truck_id} geteilt ({self.share_mode})"
-                        logger.info(self.last_action)
-                        
-                        # Reset Fehler-Counter
-                        self.last_success_time = time.time()
-                        self.error_count = 0
-                        
-                        # Warte nach Teilen
-                        time.sleep(5)
+                        self.last_action = f"Stärke {staerke} bereits bekannt - übersprungen"
+                        self.click(COORDS_NEW['esc'][0], COORDS_NEW['esc'][1])
                     
-                    # Scroll oder wechsel Position für nächsten LKW
-                    self.swipe(540, 1000, 540, 500)  # Nach oben scrollen
-                    time.sleep(2)
-                    
+                    self.trucks_skipped += 1
+                    self.trucks_processed += 1
+                    continue
+                
+                # LKW teilen!
+                self.last_action = f"Teile LKW (Stärke: {staerke})"
+                self.save_staerke(staerke) # V2-Funktion
+                
+                # Server auslesen für Statistik
+                server = self.ocr_server() # Eigene Hilfsfunktion
+                
+                # Wähle Koordinaten basierend auf share_mode
+                if self.share_mode == "alliance":
+                    coords = COORDS_ALLIANCE
+                    mode_text = "Allianz-Chat"
                 else:
-                    # Kein LKW gefunden
-                    no_truck_counter += 1
-                    self.last_action = f"Kein LKW gefunden (Versuch {no_truck_counter}) - Scrolle..."
-                    
-                    # Verschiedene Scroll-Strategien probieren
-                    if no_truck_counter % 3 == 0:
-                        # Nach unten scrollen
-                        self.swipe(540, 500, 540, 1000)
-                        self.last_action = "Scrolle nach unten..."
-                    elif no_truck_counter % 3 == 1:
-                        # Nach oben scrollen  
-                        self.swipe(540, 1000, 540, 500)
-                        self.last_action = "Scrolle nach oben..."
-                    else:
-                        # Tippe irgendwo um Liste zu refreshen
-                        self.click(360, 640)
-                        self.last_action = "Refresh Liste..."
-                    
-                    time.sleep(3)
-                    
-                    # Nach vielen Versuchen Warnung
-                    if no_truck_counter > 30:
-                        logger.warning(f"Lange keine LKWs gefunden ({no_truck_counter} Versuche)")
-                        self.last_action = "Warnung: Lange keine LKWs gefunden!"
-                        no_truck_counter = 0  # Reset für neuen Versuch
+                    coords = COORDS_NEW
+                    mode_text = "Weltchat"
+                
+                self.last_action = f"Teile LKW im {mode_text} (Stärke: {staerke})"
+                
+                self.click(coords['share'][0], coords['share'][1])
+                self.click(coords['share_confirm1'][0], coords['share_confirm1'][1])
+                self.click(coords['share_confirm2'][0], coords['share_confirm2'][1])
+                self.click(coords['esc'][0], coords['esc'][1])
+                
+                self.trucks_shared += 1
+                self.trucks_processed += 1
+                self.last_action = f"LKW erfolgreich geteilt! ({self.trucks_shared} gesamt)"
+                
+                # Statistik speichern
+                self.log_truck_stat(staerke, server) # V2-Funktion
                 
             except Exception as e:
                 logger.error(f"Fehler in Bot-Schleife: {e}")
                 import traceback
-                logger.error(traceback.format_exc())
-                self.last_action = f"Fehler: {str(e)[:50]}..."
-                self.error_count += 1
+                logger.error(traceback.format_exc()) # Besser für Debugging
+                self.last_action = f"Fehler: {str(e)}"
                 time.sleep(5)
             
-            # Prüfe ob Auto-Maintenance aktiviert werden sollte
+            # Prüfe Maintenance-Mode (V2-Funktion)
             self.check_auto_maintenance()
         
         # Cleanup
-        self.close_ssh_tunnel()
+        self.close_ssh_tunnel() # V2-Funktion
         self.status = "Gestoppt"
-        self.last_action = "Bot wurde gestoppt"
         logger.info("Bot-Schleife beendet")
     
     def reset_timer(self):
@@ -979,7 +976,7 @@ class BotController:
                 self.last_action = f"Stärken-Liste nach {self.reset_interval} Min. zurückgesetzt"
     
     def start(self):
-        """Startet den Bot"""
+        """Startet den Bot (V2-Logik)"""
         if not self.running:
             self.running = True
             self.paused = False
@@ -988,13 +985,13 @@ class BotController:
             logger.info(f"Bot gestartet von {self.current_user}")
     
     def pause(self):
-        """Pausiert/Fortsetzt den Bot"""
+        """Pausiert/Fortsetzt den Bot (V2-Logik)"""
         if self.running:
             self.paused = not self.paused
             logger.info(f"Bot {'pausiert' if self.paused else 'fortgesetzt'}")
     
     def stop(self):
-        """Stoppt den Bot"""
+        """Stoppt den Bot (V2-Logik)"""
         self.running = False
         self.use_timer = False  # Timer deaktivieren
         self.timer_start_time = None
@@ -1007,7 +1004,7 @@ class BotController:
 # Globale Bot-Instanz
 bot = BotController()
 
-# ================== Flask Routes ==================
+# ================== Flask Routes (V2-Logik) ==================
 
 def get_language():
     """Holt die aktuelle Sprache aus der Session"""
@@ -1090,7 +1087,6 @@ def api_status():
 @app.route('/api/start', methods=['POST'])
 @login_required
 def api_start():
-    # Queue-System: Admin hat Priorität
     users = load_users()
     if current_user.username in users and users[current_user.username].get('blocked', False):
         return jsonify({'error': 'User is blocked'}), 403
@@ -1099,7 +1095,6 @@ def api_start():
         if bot.current_user and bot.current_user != current_user.username:
             if current_user.role != 'admin':
                 return jsonify({'error': f'Bot wird bereits von {bot.current_user} verwendet'}), 409
-            # Admin übernimmt
             bot.stop()
         
         bot.current_user = current_user.username
@@ -1128,7 +1123,6 @@ def api_stop():
 @login_required
 def api_settings():
     if request.method == 'POST':
-        # Prüfe ob User gesperrt ist
         users = load_users()
         if current_user.username in users and users[current_user.username].get('blocked', False):
             return jsonify({'error': 'User is blocked'}), 403
@@ -1140,16 +1134,13 @@ def api_settings():
         bot.server_number = data.get('server_number', '49')
         bot.reset_interval = int(data.get('reset_interval', 15))
         
-        # Timer-Einstellungen
         bot.use_timer = data.get('use_timer', False)
         bot.timer_duration_minutes = int(data.get('timer_duration', 60))
         
-        # Share-Mode: Prüfe ob User wählen darf
         user_data = users.get(current_user.username, {})
         if user_data.get('can_choose_share_mode', True):
             bot.share_mode = data.get('share_mode', 'world')
         else:
-            # User darf nicht wählen - nutze forced_mode
             bot.share_mode = user_data.get('forced_share_mode', 'world')
         
         log_audit(current_user.username, 'Change Settings', 
@@ -1159,13 +1150,11 @@ def api_settings():
         
         return jsonify({'success': True})
     else:
-        # Prüfe ob User share_mode wählen darf
         users = load_users()
         user_data = users.get(current_user.username, {})
         can_choose = user_data.get('can_choose_share_mode', True)
         forced_mode = user_data.get('forced_share_mode', None)
         
-        # Prüfe ob Mode-Change-Request existiert
         mode_request = bot.mode_change_requests.get(current_user.username, {})
         
         return jsonify({
@@ -1186,7 +1175,6 @@ def api_settings():
 @app.route('/api/request_mode_change', methods=['POST'])
 @login_required
 def api_request_mode_change():
-    """Fordert einen Modus-Wechsel an"""
     data = request.json
     requested_mode = data.get('requested_mode')
     
@@ -1207,33 +1195,28 @@ def api_reset_stats():
     return jsonify({'success': True})
 
 
-# ================== SSH Configuration Routes (KORRIGIERT!) ==================
+# ================== SSH Configuration Routes (V2-Logik) ==================
 
 @app.route('/api/admin/ssh_config', methods=['GET', 'POST'])
 @login_required
 def api_admin_ssh_config():
-    """SSH-Konfiguration verwalten"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     if request.method == 'POST':
         data = request.json
-        
-        # Validierung
         ssh_command = data.get('ssh_command', '').strip()
         ssh_password = data.get('ssh_password', '').strip()
         
         if not ssh_command:
             return jsonify({'error': 'SSH-Command ist erforderlich'}), 400
         
-        # Parse und extrahiere Local Port
         parsed = parse_ssh_command(ssh_command)
         if not parsed:
             return jsonify({'error': 'Ungültiger SSH-Command'}), 400
         
-        local_port = parsed.get('local_port') # parse_ssh_command gibt jetzt int zurück
+        local_port = parsed.get('local_port')
         
-        # Speichere Konfiguration
         config = {
             'ssh_command': ssh_command,
             'ssh_password': ssh_password,
@@ -1241,15 +1224,13 @@ def api_admin_ssh_config():
         }
         
         if save_ssh_config(config):
-            # Update Bot-Konfiguration
             bot.ssh_config = config
             
-            # Wenn Bot läuft, versuche Reconnect
             if bot.running:
                 logger.info("Bot läuft, starte SSH-Tunnel neu...")
-                bot.close_ssh_tunnel() # KORRIGIERT
+                bot.close_ssh_tunnel()
                 time.sleep(1)
-                bot.setup_ssh_tunnel() # KORRIGIERT
+                bot.setup_ssh_tunnel()
             
             log_audit(current_user.username, 'Update SSH Config', 'SSH-Konfiguration aktualisiert')
             return jsonify({'success': True, 'message': 'SSH-Konfiguration gespeichert'})
@@ -1257,7 +1238,6 @@ def api_admin_ssh_config():
             return jsonify({'error': 'Fehler beim Speichern'}), 500
     
     else:
-        # GET - Lade aktuelle Konfiguration
         config = load_ssh_config()
         return jsonify({
             'ssh_command': config.get('ssh_command', ''),
@@ -1269,17 +1249,14 @@ def api_admin_ssh_config():
 @app.route('/api/admin/test_ssh', methods=['POST'])
 @login_required
 def api_admin_test_ssh():
-    """Teste SSH-Verbindung"""
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        # Trenne bestehende Verbindung
-        bot.close_ssh_tunnel() # KORRIGIERT
+        bot.close_ssh_tunnel()
         time.sleep(1)
         
-        # Versuche neue Verbindung
-        if bot.setup_ssh_tunnel(): # KORRIGIERT
+        if bot.setup_ssh_tunnel():
             return jsonify({
                 'success': True,
                 'message': 'SSH-Tunnel und ADB erfolgreich verbunden'
@@ -1297,7 +1274,8 @@ def api_admin_test_ssh():
             'message': f'Fehler: {str(e)}'
         }), 500
 
-# Admin Routes
+# ================== Admin Routes (V2-Logik) ==================
+
 @app.route('/admin')
 @login_required
 def admin():
@@ -1390,11 +1368,9 @@ def api_admin_stats():
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
-    # Zeitbereich aus Query-Parametern
     start_str = request.args.get('start', '')
     end_str = request.args.get('end', '')
     
-    # Lade Statistiken
     if os.path.exists(STATS_FILE):
         try:
             with open(STATS_FILE, 'r') as f:
@@ -1409,14 +1385,13 @@ def api_admin_stats():
     else:
         all_stats = []
     
-    # Filter nach Zeitbereich wenn angegeben
+    # Filtern nach Zeitbereich
     filtered_stats = []
     if not start_str and not end_str:
         filtered_stats = all_stats
     else:
         for stat in all_stats:
             try:
-                # Mache Zeitzonen-naive Vergleiche, falls Inputs keine TZ haben
                 stat_time = datetime.fromisoformat(stat['timestamp']).replace(tzinfo=None)
                 include = True
                 
@@ -1453,7 +1428,6 @@ def api_admin_audit_log():
     else:
         logs = []
     
-    # Nur letzte 100 Einträge
     return jsonify({'logs': logs[-100:]})
 
 @app.route('/api/admin/maintenance', methods=['POST'])
@@ -1477,10 +1451,8 @@ def stats_page():
     return render_template('stats.html', user=current_user)
 
 if __name__ == '__main__':
-    # Initialisiere Users
     init_users()
     
-    # Lade SSH-Konfiguration und gib Info aus
     ssh_config = load_ssh_config()
     if ssh_config.get('ssh_command'):
         logger.info("SSH-Konfiguration geladen")
@@ -1489,6 +1461,5 @@ if __name__ == '__main__':
         logger.warning("⚠️  KEINE SSH-KONFIGURATION VORHANDEN!")
         logger.warning("Bitte im Admin-Panel konfigurieren: http://<deine-ip>:5000/admin")
     
-    # Starte Flask
-    logger.info("Starte LKW-Bot Web-Interface v2.1...")
+    logger.info("Starte LKW-Bot Web-Interface v2.2 (Fusioniert)...")
     app.run(host='0.0.0.0', port=5000, debug=False)
