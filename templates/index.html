@@ -312,6 +312,55 @@
             display: block;
         }
         
+        .maintenance-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .maintenance-modal {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .maintenance-modal h2 {
+            color: #ffc107;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        
+        .maintenance-modal p {
+            color: #495057;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .maintenance-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ffc107;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .maintenance-mode {
             background: #ffc107;
             color: #000;
@@ -403,10 +452,6 @@
                 {% endif %}
                 <a href="/logout" class="btn-logout">{{ t('logout') }}</a>
             </div>
-        </div>
-        
-        <div id="maintenanceAlert" class="maintenance-mode" style="display: none;">
-            ⚠️ Maintenance-Mode aktiv - Bot pausiert
         </div>
         
         <div id="alerts"></div>
@@ -527,6 +572,15 @@
         </div>
     </div>
     
+    <!-- Maintenance Overlay -->
+    <div id="maintenanceOverlay" class="maintenance-overlay">
+        <div class="maintenance-modal">
+            <h2>⚠️ {{ t('maintenance_active') }}</h2>
+            <p>{{ t('maintenance_message') }}</p>
+            <div class="maintenance-spinner"></div>
+        </div>
+    </div>
+    
     <script>
         let currentStatus = {};
         let updateInterval;
@@ -579,11 +633,11 @@
                     document.getElementById('trucksSkipped').textContent = data.trucks_skipped;
                     
                     // Maintenance-Mode
-                    const maintenanceAlert = document.getElementById('maintenanceAlert');
+                    const maintenanceOverlay = document.getElementById('maintenanceOverlay');
                     if (data.maintenance_mode) {
-                        maintenanceAlert.style.display = 'block';
+                        maintenanceOverlay.style.display = 'flex';
                     } else {
-                        maintenanceAlert.style.display = 'none';
+                        maintenanceOverlay.style.display = 'none';
                     }
                     
                     // Timer-Info
