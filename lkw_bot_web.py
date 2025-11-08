@@ -3,7 +3,7 @@
 """
 LKW-Bot für Last War mit Web-Interface
 Optimiert für Raspberry Pi und VMOSCloud über SSH-Tunnel
-Version 2.0 - Mit Timer-Feature und verbessertem Share-Mode-Management
+Version 2.1 - Mit SSH-Konfiguration im Admin-Panel
 """
 
 import subprocess
@@ -127,18 +127,75 @@ TRANSLATIONS = {
     }
 }
 
+
+# ================== SSH Konfiguration (NEU!) ==================
+
+def load_ssh_config():
+    """Lade SSH-Konfiguration aus Datei"""
+    if os.path.exists(SSH_CONFIG_FILE):
+        try:
+            with open(SSH_CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der SSH-Konfiguration: {e}")
+    
+    # Standard-Konfiguration
+    return {
+        'ssh_command': '',
+        'ssh_password': '',
+        'local_adb_port': 5839,
+        'last_updated': None
+    }
+
+def save_ssh_config(config):
+    """Speichere SSH-Konfiguration"""
+    config['last_updated'] = datetime.now().isoformat()
+    try:
+        with open(SSH_CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        logger.info("SSH-Konfiguration gespeichert")
+        return True
+    except Exception as e:
+        logger.error(f"Fehler beim Speichern der SSH-Konfiguration: {e}")
+        return False
+
+def parse_ssh_command(ssh_command):
+    """Extrahiere Informationen aus dem SSH-Command"""
+    try:
+        # Beispiel: ssh -oHostKeyAlgorithms=+ssh-rsa 10.0.4.206_1762615280757@103.237.100.130 -p 1824 -L 8583:adb-proxy:50438 -Nf
+        parts = ssh_command.split()
+        
+        # Finde den User@Host Teil
+        user_host = None
+        port = None
+        local_port = None
+        remote_info = None
+        
+        for i, part in enumerate(parts):
+            if '@' in part and not part.startswith('-'):
+                user_host = part
+            elif part == '-p' and i + 1 < len(parts):
+                port = parts[i + 1]
+            elif part == '-L' and i + 1 < len(parts):
+                # Format: local_port:remote_host:remote_port
+                tunnel_info = parts[i + 1]
+                local_port = tunnel_info.split(':')[0]
+                remote_info = tunnel_info
+        
+        return {
+            'user_host': user_host,
+            'port': port,
+            'local_port': local_port,
+            'remote_info': remote_info,
+            'full_command': ssh_command
+        }
+    except Exception as e:
+        logger.error(f"Fehler beim Parsen des SSH-Commands: {e}")
+        return None
+
 # ================== SSH/ADB Konfiguration ==================
-
-# SSH-Verbindungsdaten zu VMOSCloud
-SSH_USER = 'socks'
-SSH_HOST = 'kp.vmoscloud.com'
-SSH_PORT = 26282
-SSH_KEY = '41dGo-'
-
-# Lokaler Port für ADB-Tunnel
-LOCAL_ADB_PORT = 16789
-# ADB-Port auf VMOSCloud
-REMOTE_ADB = 'localhost:5555'
+# HINWEIS: SSH-Konfiguration erfolgt jetzt über Admin-Panel!
+# Keine hartcodierten Werte mehr nötig - alles wird in ssh_config.json gespeichert
 
 # ================== Flask Setup ==================
 
@@ -170,6 +227,7 @@ AUDIT_LOG_FILE = 'audit_log.json'
 MAINTENANCE_FILE = 'maintenance.json'
 STATS_FILE = 'truck_stats.json'
 MODE_REQUESTS_FILE = 'mode_requests.json'
+SSH_CONFIG_FILE = 'ssh_config.json'  # NEU: SSH-Konfiguration
 
 # ================== User System ==================
 
@@ -1095,6 +1153,96 @@ def api_reset_stats():
     log_audit(current_user.username, 'Reset Statistics', '')
     return jsonify({'success': True})
 
+
+# ================== SSH Configuration Routes (NEU!) ==================
+
+@app.route('/api/admin/ssh_config', methods=['GET', 'POST'])
+@login_required
+def api_admin_ssh_config():
+    """SSH-Konfiguration verwalten"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if request.method == 'POST':
+        data = request.json
+        
+        # Validierung
+        ssh_command = data.get('ssh_command', '').strip()
+        ssh_password = data.get('ssh_password', '').strip()
+        
+        if not ssh_command:
+            return jsonify({'error': 'SSH-Command ist erforderlich'}), 400
+        
+        # Parse und extrahiere Local Port
+        parsed = parse_ssh_command(ssh_command)
+        if not parsed:
+            return jsonify({'error': 'Ungültiger SSH-Command'}), 400
+        
+        local_port = int(parsed.get('local_port', 5839))
+        
+        # Speichere Konfiguration
+        config = {
+            'ssh_command': ssh_command,
+            'ssh_password': ssh_password,
+            'local_adb_port': local_port
+        }
+        
+        if save_ssh_config(config):
+            # Update Bot-Konfiguration
+            bot.ssh_config = config
+            
+            # Wenn Bot läuft, versuche Reconnect
+            if bot.running:
+                bot.disconnect_adb()
+                time.sleep(1)
+                bot.connect_adb()
+            
+            log_audit(current_user.username, 'Update SSH Config', 'SSH-Konfiguration aktualisiert')
+            return jsonify({'success': True, 'message': 'SSH-Konfiguration gespeichert'})
+        else:
+            return jsonify({'error': 'Fehler beim Speichern'}), 500
+    
+    else:
+        # GET - Lade aktuelle Konfiguration
+        config = load_ssh_config()
+        return jsonify({
+            'ssh_command': config.get('ssh_command', ''),
+            'ssh_password': config.get('ssh_password', ''),
+            'local_adb_port': config.get('local_adb_port', 5839),
+            'last_updated': config.get('last_updated', None)
+        })
+
+@app.route('/api/admin/test_ssh', methods=['POST'])
+@login_required
+def api_admin_test_ssh():
+    """Teste SSH-Verbindung"""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Trenne bestehende Verbindung
+        bot.disconnect_adb()
+        time.sleep(1)
+        
+        # Versuche neue Verbindung
+        if bot.connect_adb():
+            return jsonify({
+                'success': True,
+                'message': 'SSH-Tunnel und ADB erfolgreich verbunden'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Verbindung fehlgeschlagen - Bitte Logs prüfen'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Fehler beim Testen der SSH-Verbindung: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Fehler: {str(e)}'
+        }), 500
+
 # Admin Routes
 @app.route('/admin')
 @login_required
@@ -1268,4 +1416,18 @@ def stats_page():
     return render_template('stats.html', user=current_user)
 
 if __name__ == '__main__':
+    # Initialisiere Users
+    init_users()
+    
+    # Lade SSH-Konfiguration und gib Info aus
+    ssh_config = load_ssh_config()
+    if ssh_config.get('ssh_command'):
+        logger.info("SSH-Konfiguration geladen")
+        logger.info(f"Letzte Aktualisierung: {ssh_config.get('last_updated', 'Unbekannt')}")
+    else:
+        logger.warning("⚠️  KEINE SSH-KONFIGURATION VORHANDEN!")
+        logger.warning("Bitte im Admin-Panel konfigurieren: http://localhost:5000/admin")
+    
+    # Starte Flask
+    logger.info("Starte LKW-Bot Web-Interface v2.1...")
     app.run(host='0.0.0.0', port=5000, debug=False)
