@@ -457,7 +457,11 @@
         <!-- Admin Maintenance Notice (non-blocking) -->
         {% if user.role == 'admin' %}
         <div id="adminMaintenanceNotice" class="maintenance-mode" style="display: none;">
-            ⚠️ {{ t('maintenance_active') }} - {{ t('maintenance_admin_info') }}
+            <div>⚠️ <strong>Wartungsarbeiten aktiv / Maintenance active</strong></div>
+            <div style="font-size: 14px; margin-top: 5px;">
+                🇩🇪 Admin-Modus: Sie können weiterhin alle Funktionen nutzen<br>
+                🇬🇧 Admin mode: You can still use all functions
+            </div>
         </div>
         {% endif %}
         
@@ -582,8 +586,9 @@
     <!-- Maintenance Overlay -->
     <div id="maintenanceOverlay" class="maintenance-overlay">
         <div class="maintenance-modal">
-            <h2>⚠️ {{ t('maintenance_active') }}</h2>
-            <p>{{ t('maintenance_message') }}</p>
+            <h2>⚠️ Wartungsarbeiten / Maintenance</h2>
+            <p style="margin-bottom: 10px; font-weight: 600;">🇩🇪 Bot ist im Wartungsmodus - Bitte warten Sie</p>
+            <p style="margin-bottom: 20px; font-weight: 600;">🇬🇧 Bot is in maintenance mode - Please wait</p>
             <div class="maintenance-spinner"></div>
         </div>
     </div>
