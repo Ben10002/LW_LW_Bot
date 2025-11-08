@@ -70,7 +70,9 @@ TRANSLATIONS = {
         'timer_minutes': 'Laufzeit (Minuten)',
         'timer_remaining': 'Verbleibende Zeit',
         'request_mode_change': 'Modus-Wechsel anfordern',
-        'mode_change_requested': 'Modus-Wechsel angefordert'
+        'mode_change_requested': 'Modus-Wechsel angefordert',
+        'maintenance_active': 'Wartungsarbeiten aktiv',
+        'maintenance_message': 'Bot ist im Wartungsmodus - Bitte warten Sie'
     },
     'en': {
         'app_title': 'Truck Bot Control',
@@ -117,7 +119,9 @@ TRANSLATIONS = {
         'timer_minutes': 'Runtime (minutes)',
         'timer_remaining': 'Time remaining',
         'request_mode_change': 'Request mode change',
-        'mode_change_requested': 'Mode change requested'
+        'mode_change_requested': 'Mode change requested',
+        'maintenance_active': 'Maintenance active',
+        'maintenance_message': 'Bot is in maintenance mode - Please wait'
     }
 }
 
@@ -636,10 +640,11 @@ class BotController:
         # SSH-Tunnel einrichten
         if not self.setup_ssh_tunnel():
             self.status = "SSH-Fehler"
+            self.last_action = "SSH-Tunnel konnte nicht erstellt werden"
             return
         
         self.status = "Läuft"
-        self.last_action = "Bot gestartet"
+        self.last_action = "Bot gestartet - Suche nach LKWs..."
         
         # Timer-Thread starten wenn aktiviert
         if self.use_timer:
@@ -654,6 +659,7 @@ class BotController:
         
         # Deutsche Zeitzone
         tz = pytz.timezone('Europe/Berlin')
+        no_truck_counter = 0
         
         while self.running:
             # Pausieren wenn nötig
@@ -665,43 +671,71 @@ class BotController:
             # Maintenance-Mode
             if self.maintenance_mode:
                 self.status = "Maintenance-Mode"
+                self.last_action = "Wartungsarbeiten - Bot pausiert"
                 time.sleep(10)
                 continue
             
             try:
+                # Screenshot machen
+                self.status = "Läuft - Erstelle Screenshot..."
+                if not self.make_screenshot():
+                    self.last_action = "Screenshot fehlgeschlagen - Retry in 5s"
+                    logger.error("Screenshot fehlgeschlagen")
+                    time.sleep(5)
+                    continue
+                
+                # Nach Truck-Template suchen
+                self.status = "Läuft - Suche LKWs..."
                 truck_info = self.extract_truck_info()
                 
                 if truck_info:
+                    no_truck_counter = 0  # Reset counter
                     self.trucks_processed += 1
                     strength_str = f"{truck_info['strength']:.1f}M"
                     server_str = truck_info['server']
+                    
+                    logger.info(f"LKW gefunden: {server_str}/{strength_str}")
                     
                     # Log Statistik
                     self.log_truck_stat(strength_str, server_str)
                     
                     # Prüfe Filter
                     skip = False
+                    skip_reason = ""
                     
                     # Stärke-Filter
                     if self.use_limit and truck_info['strength'] > self.strength_limit:
                         skip = True
-                        self.last_action = f"LKW {strength_str} übersprungen (zu stark)"
+                        skip_reason = f"zu stark ({strength_str} > {self.strength_limit}M)"
                     
                     # Server-Filter
                     if self.use_server_filter and server_str != self.server_number:
                         skip = True
-                        self.last_action = f"LKW Server {server_str} übersprungen"
+                        skip_reason = f"falscher Server ({server_str} != {self.server_number})"
                     
                     # Bereits geteilt?
                     truck_id = f"{server_str}/{strength_str}"
                     if truck_id in self.load_staerken():
                         skip = True
-                        self.last_action = f"LKW {truck_id} bereits geteilt"
+                        skip_reason = "bereits geteilt"
                     
                     if skip:
                         self.trucks_skipped += 1
+                        self.last_action = f"LKW {truck_id} übersprungen: {skip_reason}"
+                        logger.info(self.last_action)
+                        
+                        # Klick irgendwo um weiterzugehen
+                        self.click(100, 100)
+                        time.sleep(2)
                     else:
+                        # Klicke auf Truck-Position um Details zu öffnen
+                        self.status = "Läuft - Öffne LKW Details..."
+                        x, y = truck_info['coords']
+                        self.click(x, y)
+                        time.sleep(2)
+                        
                         # Teile LKW
+                        self.status = f"Läuft - Teile LKW im {self.share_mode}..."
                         self.share_truck()
                         self.save_staerke(truck_id)
                         self.trucks_shared += 1
@@ -717,35 +751,50 @@ class BotController:
                         # Warte nach Teilen
                         time.sleep(5)
                     
-                    # Zurück und weiter suchen
-                    self.click(100, 100)  # Zurück-Button
-                    time.sleep(2)
+                    # Scroll oder wechsel Position für nächsten LKW
                     self.swipe(540, 1000, 540, 500)  # Nach oben scrollen
                     time.sleep(2)
                     
                 else:
                     # Kein LKW gefunden
-                    self.last_action = "Suche nach LKWs..."
-                    self.swipe(540, 1000, 540, 500)
+                    no_truck_counter += 1
+                    self.last_action = f"Kein LKW gefunden (Versuch {no_truck_counter}) - Scrolle..."
+                    
+                    # Verschiedene Scroll-Strategien probieren
+                    if no_truck_counter % 3 == 0:
+                        # Nach unten scrollen
+                        self.swipe(540, 500, 540, 1000)
+                        self.last_action = "Scrolle nach unten..."
+                    elif no_truck_counter % 3 == 1:
+                        # Nach oben scrollen  
+                        self.swipe(540, 1000, 540, 500)
+                        self.last_action = "Scrolle nach oben..."
+                    else:
+                        # Tippe irgendwo um Liste zu refreshen
+                        self.click(360, 640)
+                        self.last_action = "Refresh Liste..."
+                    
                     time.sleep(3)
                     
-                    # Fehlerüberwachung
-                    self.error_count += 1
-                    if self.error_count > 30:
-                        logger.warning("Lange keine LKWs gefunden")
-                        self.error_count = 0
+                    # Nach vielen Versuchen Warnung
+                    if no_truck_counter > 30:
+                        logger.warning(f"Lange keine LKWs gefunden ({no_truck_counter} Versuche)")
+                        self.last_action = "Warnung: Lange keine LKWs gefunden!"
+                        no_truck_counter = 0  # Reset für neuen Versuch
                 
             except Exception as e:
                 logger.error(f"Fehler in Bot-Schleife: {e}")
-                self.last_action = f"Fehler: {str(e)}"
+                self.last_action = f"Fehler: {str(e)[:50]}..."
+                self.error_count += 1
                 time.sleep(5)
             
-            # Prüfe Maintenance-Mode
+            # Prüfe ob Auto-Maintenance aktiviert werden sollte
             self.check_auto_maintenance()
         
         # Cleanup
         self.close_ssh_tunnel()
         self.status = "Gestoppt"
+        self.last_action = "Bot wurde gestoppt"
         logger.info("Bot-Schleife beendet")
     
     def reset_timer(self):
