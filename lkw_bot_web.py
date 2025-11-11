@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 LKW-Bot & Gold-Zombie-Bot mit Web-Interface
-Version 3.0 - Dual-Bot-System
+Version 3.1 - Korrektur für Admin-Redirect und Zombie-Berechtigung
 """
 
 import subprocess
@@ -16,7 +16,7 @@ import re
 import threading
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path  # <-- HIER IST DER FEHLENDE IMPORT VON LETZTEM MAL
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -155,12 +155,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ================== Dateipfade ==================
+# ================== Dateipfade & SPIEL-KONFIGURATION (V1-Logik) ==================
 
 # LKW-Bot Dateien
-LKW_TEMPLATE_FILE = 'rentier_template.png'
-LKW_STAERKEN_FILE = 'lkw_staerken.txt'
-LKW_STATS_FILE = 'truck_stats.json'
+LKW_TEMPLATE_FILE = 'rentier_template.png' # Name der Template-Datei
+LKW_STAERKEN_FILE = 'lkw_staerken.txt'     # Datei für bereits geteilte Stärken
+LKW_STATS_FILE = 'truck_stats.json'        # Datei für Statistiken (ersetzt truck_data.json)
 LKW_SSH_CONFIG_FILE = 'ssh_config.json'
 
 # Zombie-Bot Dateien
@@ -172,6 +172,27 @@ USERS_FILE = 'users.json'
 AUDIT_LOG_FILE = 'audit_log.json'
 MAINTENANCE_FILE = 'maintenance.json'
 MODE_REQUESTS_FILE = 'mode_requests.json'
+
+
+# Klick-Koordinaten (aus altem Skript)
+COORDS_NEW = {
+    'esc': (680, 70),           # ESC-Button oben rechts
+    'share': (450, 1100),       # Teilen-Button
+    'share_confirm1': (300, 450), # Bestätigung 1 - Weltchat
+    'share_confirm2': (400, 750), # Bestätigung 2 - Weltchat
+}
+
+# Koordinaten für Allianz-Chat (aus altem Skript)
+COORDS_ALLIANCE = {
+    'esc': (680, 70),           # ESC-Button (gleich)
+    'share': (450, 1100),       # Teilen-Button (gleich)
+    'share_confirm1': (300, 700), # Bestätigung 1 - Allianz-Chat
+    'share_confirm2': (400, 750), # Bestätigung 2 - Allianz-Chat (gleich)
+}
+
+# OCR-Boxen (aus altem Skript)
+STAERKE_BOX = (200, 950, 300, 1000)   # Stärke-Bereich (links, oben, rechts, unten)
+SERVER_BOX = (160, 860, 220, 915)    # Server-Bereich (links, oben, rechts, unten)
 
 
 # ================== User System (Erweitert) ==================
@@ -262,19 +283,29 @@ def log_audit(username, action, details=""):
     with open(AUDIT_LOG_FILE, 'w') as f:
         json.dump(logs, f, indent=2)
 
+# =========================================================================
+# === HIER IST FIX #2: load_user() ===
+# =========================================================================
 @login_manager.user_loader
 def load_user(username):
     users = load_users()
     if username in users:
         user_data = users[username]
+        
+        # KORREKTUR: Stelle sicher, dass 'admin' IMMER Zombie-Zugriff hat,
+        # auch wenn die users.json-Datei alt ist.
+        has_zombie_access = user_data.get('can_use_zombie_bot', False)
+        if user_data.get('role') == 'admin':
+            has_zombie_access = True
+            
         return User(
             username, 
             user_data['password'], 
-            user_data['role'], 
+            user_data.get('role', 'user'), 
             user_data.get('blocked', False),
             user_data.get('can_choose_share_mode', True),
             user_data.get('forced_share_mode', None),
-            user_data.get('can_use_zombie_bot', False) # NEU
+            has_zombie_access # Verwendet die korrigierte Variable
         )
     return None
 
@@ -1413,12 +1444,14 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+# =========================================================================
+# === HIER IST FIX #1: index() Route ===
+# =========================================================================
 @app.route('/')
 @login_required
 def index():
-    # Admin zur Admin-Seite weiterleiten, andere zum LKW-Bot
-    if current_user.role == 'admin':
-         return render_template('admin.html', t=translate, lang=get_language(), user=current_user)
+    # KORREKTUR: Zeigt IMMER das LKW-Bot Dashboard (index.html).
+    # Das Admin-Panel ist separat unter /admin erreichbar.
     return render_template('index.html', t=translate, lang=get_language(), user=current_user)
 
 @app.route('/api/status')
@@ -1628,13 +1661,15 @@ def api_admin_users():
     users = load_users()
     user_list = []
     for username, data in users.items():
+        # Lade den Benutzer mit der korrigierten Logik, um sicherzustellen, dass Admin Rechte hat
+        user_obj = load_user(username)
         user_list.append({
             'username': username,
             'role': data['role'],
             'blocked': data.get('blocked', False),
             'can_choose_share_mode': data.get('can_choose_share_mode', True),
             'forced_share_mode': data.get('forced_share_mode', None),
-            'can_use_zombie_bot': data.get('can_use_zombie_bot', False) # NEU
+            'can_use_zombie_bot': user_obj.can_use_zombie_bot # Benutze den geladenen Wert
         })
     return jsonify({'users': user_list})
 
@@ -1664,7 +1699,6 @@ def api_admin_set_share_mode(username):
         return jsonify({'success': True})
     return jsonify({'error': 'User not found'}), 404
 
-# --- NEUE ADMIN ROUTE FÜR ZOMBIE-BOT BERECHTIGUNG ---
 @app.route('/api/admin/user/toggle_zombie_access/<username>', methods=['POST'])
 @login_required
 def api_admin_toggle_zombie_access(username):
@@ -1673,12 +1707,15 @@ def api_admin_toggle_zombie_access(username):
     
     users = load_users()
     if username in users:
+        # Admins können sich nicht selbst die Rechte entziehen
+        if users[username].get('role') == 'admin':
+             return jsonify({'error': 'Admin hat immer Zugriff'}), 400
+             
         users[username]['can_use_zombie_bot'] = not users[username].get('can_use_zombie_bot', False)
         save_users(users)
         log_audit(current_user.username, 'Toggle Zombie-Bot Access', f"{username}: {users[username]['can_use_zombie_bot']}")
         return jsonify({'success': True})
     return jsonify({'error': 'User not found'}), 404
-# --- ENDE NEUE ROUTE ---
 
 @app.route('/api/admin/mode_requests')
 @login_required
@@ -1781,7 +1818,6 @@ def stats_page():
 @login_required
 def gold_zombies_page():
     """Zeigt das Gold-Zombie-Dashboard an"""
-    # Nur User mit Berechtigung dürfen zugreifen
     if not current_user.can_use_zombie_bot:
         return redirect(url_for('index'))
     return render_template('gold_zombie.html', user=current_user)
@@ -1821,7 +1857,6 @@ def api_gold_zombies_settings():
     if request.method == 'POST':
         data = request.json
         
-        # Einstellungen für den Bot-Lauf
         zombie_bot.use_trupp_1 = data.get('use_trupp_1', False)
         zombie_bot.use_trupp_2 = data.get('use_trupp_2', True)
         zombie_bot.use_trupp_3 = data.get('use_trupp_3', True)
@@ -1829,7 +1864,6 @@ def api_gold_zombies_settings():
         zombie_bot.ausdauer_10_limit = int(data.get('stamina_10', 0))
         zombie_bot.unbegrenzt_mode = data.get('unlimited', False)
         
-        # Separate SSH-Einstellungen
         ssh_command = data.get('ssh_command', '').strip()
         ssh_password = data.get('ssh_password', '').strip()
 
@@ -1880,11 +1914,9 @@ def api_gold_zombies_start():
     if not current_user.can_use_zombie_bot:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    # Validiere, dass Truppen ausgewählt sind
     if not (zombie_bot.use_trupp_1 or zombie_bot.use_trupp_2 or zombie_bot.use_trupp_3):
         return jsonify({'error': 'Mindestens eine Truppe muss ausgewählt sein!'}), 400
     
-    # Validiere Ausdauer (wenn nicht unbegrenzt)
     if not zombie_bot.unbegrenzt_mode:
         if zombie_bot.ausdauer_50_limit <= 0 and zombie_bot.ausdauer_10_limit <= 0:
             return jsonify({'error': 'Mindestens ein Ausdauer-Limit muss > 0 sein!'}), 400
@@ -1933,7 +1965,6 @@ def api_gold_zombies_test_ssh():
 if __name__ == '__main__':
     init_users()
     
-    # Lade beide SSH-Konfigurationen beim Start
     lkw_ssh_config = load_ssh_config(LKW_SSH_CONFIG_FILE)
     if lkw_ssh_config.get('ssh_command'):
         logger.info("LKW-Bot SSH-Konfiguration geladen")
@@ -1946,5 +1977,5 @@ if __name__ == '__main__':
     else:
         logger.warning("⚠️  KEINE GOLD-ZOMBIE-BOT SSH-KONFIGURATION VORHANDEN!")
     
-    logger.info("Starte Dual-Bot Web-Interface v3.0...")
+    logger.info("Starte Dual-Bot Web-Interface v3.1 (Hotfix)...")
     app.run(host='0.0.0.0', port=5000, debug=False)
