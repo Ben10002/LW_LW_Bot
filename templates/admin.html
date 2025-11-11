@@ -24,7 +24,7 @@
             margin: 0 auto;
         }
 
-        /* === Header (V1/V2 - Identisch) === */
+        /* === Header === */
         .header {
             background: white;
             padding: 20px 30px;
@@ -50,9 +50,10 @@
         .header-actions {
             display: flex;
             gap: 15px;
+            flex-wrap: wrap;
         }
 
-        /* === Buttons (V1/V2 - Kombiniert) === */
+        /* === Buttons === */
         .btn {
             padding: 10px 20px;
             border: none;
@@ -83,7 +84,7 @@
             flex-wrap: wrap;
         }
         
-        /* === Karten & Layout (V1/V2) === */
+        /* === Karten & Layout === */
         .card {
             background: white;
             padding: 25px;
@@ -108,7 +109,7 @@
             margin-bottom: 20px;
         }
 
-        /* === Formulare (V1/V2 Kombiniert) === */
+        /* === Formulare === */
         .form-group {
             margin-bottom: 15px;
         }
@@ -151,7 +152,7 @@
             margin-top: 5px;
         }
 
-        /* === Tabellen & Badges (V1) === */
+        /* === Tabellen & Badges === */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -188,6 +189,9 @@
         .badge-pending { background: #ffc107; color: #000; }
         .badge-approved { background: #28a745; color: white; }
         .badge-rejected { background: #dc3545; color: white; }
+        /* Badge-Farben für Zombie-Zugriff (aus V1 übernommen) */
+        .badge-success { background: #28a745; color: white; }
+        .badge-danger { background: #dc3545; color: white; }
         
         .action-btns {
             display: flex;
@@ -201,7 +205,7 @@
             white-space: nowrap;
         }
         
-        /* === Audit Log & Modus-Anfragen (V1) === */
+        /* === Audit Log & Modus-Anfragen === */
         .audit-log {
             max-height: 400px;
             overflow-y: auto;
@@ -238,7 +242,7 @@
             color: #495057;
         }
         
-        /* === Modals (V1) === */
+        /* === Modals === */
         .modal {
             display: none;
             position: fixed;
@@ -270,7 +274,7 @@
         
         .close:hover { color: #000; }
         
-        /* === Switch (V1) === */
+        /* === Switch === */
         .switch {
             position: relative;
             display: inline-block;
@@ -337,9 +341,6 @@
             color: #667eea;
             margin-bottom: 15px;
             font-size: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
         
         .info-box p {
@@ -410,32 +411,28 @@
         <div class="header">
             <div>
                 <h1>👨‍💼 Admin Dashboard</h1>
-                <small>LKW-Bot Verwaltung & VMOS Steuerung</small>
+                <small>LKW-Bot & Zombie-Bot Verwaltung</small>
             </div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="location.href='/stats'">📊 Statistiken</button>
-                <button class="btn btn-secondary" onclick="location.href='/'">← Zurück</button>
-                <button class="btn btn-danger" onclick="location.href='/logout'">Abmelden</button>
+                <a href="{{ url_for('stats_page') }}" class="btn btn-primary">📊 LKW-Statistik</a>
+                {% if user.can_use_zombie_bot %}
+                <a href="{{ url_for('gold_zombies_page') }}" class="btn btn-primary" style="background-color: #ffc107; color: #000;">🧟 Gold-Zombies</a>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">🚛 LKW-Bot</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Abmelden</a>
             </div>
         </div>
 
         <div class="card">
-            <h2>🔐 SSH-Konfiguration (VMOSCloud)</h2>
+            <h2>🔐 LKW-Bot SSH-Konfiguration (VMOSCloud)</h2>
             
             <div id="sshStatus"></div>
             
             <div class="info-box">
-                <h3>ℹ️ Anleitung - So funktioniert's</h3>
-                <p><strong>1. SSH-Command von VMOSCloud kopieren:</strong></p>
-                <p>Gehe zu VMOSCloud → Wähle dein Gerät → Suche "ADB Connect"</p>
-                <p>Beispiel: <code>ssh -oHostKeyAlgorithms=+ssh-rsa ...@HOST... -p PORT -L 8583:adb-proxy:50438 -Nf</code></p>
-                
-                <p style="margin-top: 15px;"><strong>2. SSH-Passwort eingeben</strong> (falls vorhanden)</p>
-                
-                <p style="margin-top: 15px;"><strong>3. Speichern & Testen</strong> (Der Bot extrahiert den lokalen Port automatisch)</p>
-                
+                <h3>ℹ️ Anleitung - LKW-Bot</h3>
+                <p>Diese SSH-Daten sind <strong>nur für den LKW-Bot</strong>. Die SSH-Daten für den Gold-Zombie-Bot werden auf dessen eigener Seite konfiguriert.</p>
                 <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; color: #856404;">
-                    <strong>⚠️ Wichtig:</strong> Diese Daten ändern sich alle 24 Stunden bei VMOSCloud!
+                    <strong>⚠️ Wichtig:</strong> VMOSCloud ändert diese Daten alle 24 Stunden!
                 </p>
             </div>
 
@@ -448,24 +445,22 @@
                         required 
                         placeholder="ssh -oHostKeyAlgorithms=+ssh-rsa USER@HOST -p PORT -L LOCAL_PORT:adb-proxy:REMOTE_PORT -Nf"
                     ></textarea>
-                    <small>📋 Kopiere den kompletten SSH-Command von VMOSCloud</small>
                 </div>
 
                 <div class="form-group">
-                    <label for="sshPassword">SSH-Passwort (optional)</label>
+                    <label for="sshPassword">SSH-Passwort / Connection Key (optional)</label>
                     <input 
                         type="password" 
                         id="sshPassword" 
                         name="ssh_password" 
-                        placeholder="Falls VMOSCloud ein Passwort verlangt..."
+                        placeholder="Falls VMOSCloud ein Passwort/Key verlangt..."
                         autocomplete="new-password"
                     >
-                    <small>🔒 Wird nur benötigt, falls VMOSCloud es fordert</small>
                 </div>
 
                 <div class="config-info">
                     <div class="config-info-item">
-                        <span class="config-info-label">Lokaler ADB-Port:</span>
+                        <span class="config-info-label">Lokaler ADB-Port (LKW):</span>
                         <span class="config-info-value" id="localPort">Nicht extrahiert</span>
                     </div>
                     <div class="config-info-item">
@@ -475,26 +470,18 @@
                 </div>
 
                 <div class="button-group">
-                    <button type="submit" class="btn btn-primary">💾 Speichern</button>
+                    <button type="submit" class="btn btn-primary" onclick="saveSshConfig(event)">💾 Speichern</button>
                     <button type="button" class="btn btn-success" onclick="testSSH()">🔌 Verbindung testen</button>
                 </div>
             </form>
 
             <div id="loading">
                 <div class="spinner"></div>
-                <p style="color: #667eea; font-weight: 600;">Teste Verbindung...</p>
+                <p style="color: #667eea; font-weight: 600;">Teste LKW-Verbindung...</p>
                 <small style="color: #6c757d;">Dies kann 10-15 Sekunden dauern</small>
             </div>
         </div>
 
-        <div class="card">
-            <h2>💡 Tipps & Tricks</h2>
-            <div style="color: #555; line-height: 1.8;">
-                <p><strong>🔄 Tägliche Routine:</strong> VMOSCloud ändert die SSH-Daten alle 24 Stunden. Setze dir einen Reminder!</p>
-                <p style="margin-top: 10px;"><strong>🐛 Fehlersuche:</strong> Wenn der Bot nicht startet, teste hier die SSH-Verbindung.</p>
-                <p style="margin-top: 10px;"><strong>🔐 Sicherheit:</strong> Die SSH-Daten werden lokal in <code>ssh_config.json</code> gespeichert.</p>
-            </div>
-        </div>
         
         <div class="dashboard-grid">
             <div class="card">
@@ -506,7 +493,7 @@
                             <th>Rolle</th>
                             <th>Status</th>
                             <th>Share-Mode</th>
-                            <th>Aktionen</th>
+                            <th>Gold-Zombie</th> <th>Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -516,29 +503,29 @@
             </div>
             
             <div class="card">
-                <h2>🔄 Modus-Wechsel-Anfragen</h2>
+                <h2>🔄 LKW-Modus-Anfragen</h2>
                 <div id="modeRequests">
                     </div>
             </div>
         </div>
         
         <div class="card">
-            <h2>🛠️ System-Steuerung</h2>
+            <h2>🛠️ LKW-Bot System-Steuerung</h2>
             <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
                 <div>
                     <label class="switch">
                         <input type="checkbox" id="maintenanceToggle" onchange="toggleMaintenance()">
                         <span class="slider"></span>
                     </label>
-                    <span style="margin-left: 10px;">Maintenance-Mode</span>
+                    <span style="margin-left: 10px;">LKW-Bot Maintenance-Mode</span>
                 </div>
-                <button class="btn btn-warning" onclick="clearLogs()">🗑️ Logs löschen</button>
-                <button class="btn btn-danger" onclick="resetAllStats()">⚠️ Alle Stats zurücksetzen</button>
+                <button class="btn btn-warning" onclick="clearLogs()">🗑️ Logs löschen (Simuliert)</button>
+                <button class="btn btn-danger" onclick="resetAllStats()">⚠️ LKW-Stats zurücksetzen (Simuliert)</button>
             </div>
         </div>
         
         <div class="card">
-            <h2>📋 Audit-Log</h2>
+            <h2>📋 Audit-Log (Letzte 100)</h2>
             <div class="audit-log" id="auditLog">
                 </div>
         </div>
@@ -565,7 +552,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Share-Mode Berechtigung</label>
+                    <label>LKW Share-Mode Berechtigung</label>
                     <select name="share_permission">
                         <option value="choose">Kann wählen</option>
                         <option value="world">Nur Weltchat</option>
@@ -580,7 +567,7 @@
     <div id="shareModeModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeShareModeModal()">&times;</span>
-            <h2>Share-Mode Einstellungen</h2>
+            <h2>LKW Share-Mode Einstellungen</h2>
             <form id="shareModeForm" onsubmit="updateShareMode(event)">
                 <input type="hidden" id="modalUsername">
                 <div class="form-group">
@@ -606,7 +593,6 @@
     <script>
         // === V1: Benutzer, Anfragen, Logs ===
         
-        // Lade Benutzer
         function loadUsers() {
             fetch('/api/admin/users')
                 .then(response => response.json())
@@ -617,17 +603,22 @@
                     
                     data.users.forEach(user => {
                         const row = tbody.insertRow();
+                        
+                        // Benutzername (0)
                         row.insertCell(0).innerHTML = `<strong>${user.username}</strong>`;
                         
+                        // Rolle (1)
                         const roleCell = row.insertCell(1);
                         const roleBadge = user.role === 'admin' ? 'badge-admin' : 'badge-user';
                         roleCell.innerHTML = `<span class="badge ${roleBadge}">${user.role}</span>`;
                         
+                        // Status (2)
                         const statusCell = row.insertCell(2);
                         const statusBadge = user.blocked ? 'badge-blocked' : 'badge-active';
                         const statusText = user.blocked ? 'Gesperrt' : 'Aktiv';
                         statusCell.innerHTML = `<span class="badge ${statusBadge}">${statusText}</span>`;
                         
+                        // LKW Share-Mode (3)
                         const modeCell = row.insertCell(3);
                         if (user.can_choose_share_mode) {
                             modeCell.innerHTML = '<span class="badge badge-active">Frei wählbar</span>';
@@ -637,17 +628,31 @@
                             modeCell.innerHTML = '<span class="badge badge-user">Standard</span>';
                         }
                         
-                        const actionsCell = row.insertCell(4);
+                        // === NEUE SPALTE FÜR GOLD-ZOMBIE (4) ===
+                        const zombieCell = row.insertCell(4);
+                        const zombieAccess = user.can_use_zombie_bot || false;
+                        zombieCell.innerHTML = `
+                            <span class="badge ${zombieAccess ? 'badge-success' : 'badge-danger'}">
+                                ${zombieAccess ? 'Erlaubt' : 'Gesperrt'}
+                            </span>
+                        `;
+                        // === ENDE NEUE SPALTE ===
+
+                        // Aktionen (5)
+                        const actionsCell = row.insertCell(5);
                         actionsCell.innerHTML = `
                             <div class="action-btns">
                                 <button class="btn btn-warning" onclick="toggleBlock('${user.username}')">
                                     ${user.blocked ? '🔓 Entsperren' : '🔒 Sperren'}
                                 </button>
                                 <button class="btn btn-primary" onclick="openShareModeModal('${user.username}', ${user.can_choose_share_mode}, '${user.forced_share_mode || ''}')">
-                                    ⚙️ Share-Mode
+                                    ⚙️ LKW-Mode
+                                </button>
+                                <button class="btn ${zombieAccess ? 'btn-danger' : 'btn-success'}" onclick="toggleZombieAccess('${user.username}')" title="Zugriff auf Gold-Zombie-Bot">
+                                    🧟 ${zombieAccess ? 'Zombie sperren' : 'Zombie erlauben'}
                                 </button>
                                 <button class="btn btn-danger" onclick="resetPassword('${user.username}')">
-                                    🔑 Passwort
+                                    🔑 Passwort (Sim)
                                 </button>
                             </div>
                         `;
@@ -656,7 +661,20 @@
                 .catch(err => console.error("Fehler beim Laden der Benutzer:", err));
         }
         
-        // Lade Modus-Wechsel-Anfragen
+        // === NEUE FUNKTION FÜR ZOMBIE-BOT ZUGRIFF ===
+        function toggleZombieAccess(username) {
+            if (confirm(`Soll der Zugriff auf den Gold-Zombie-Bot für '${username}' wirklich umgeschaltet werden?`)) {
+                fetch(`/api/admin/user/toggle_zombie_access/${username}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(() => {
+                        loadUsers();
+                        loadAuditLog();
+                        showToastAlert('Zombie-Zugriff geändert', 'success');
+                    });
+            }
+        }
+        // === ENDE NEUE FUNKTION ===
+
         function loadModeRequests() {
             fetch('/api/admin/mode_requests')
                 .then(response => response.json())
@@ -702,7 +720,6 @@
                 .catch(err => console.error("Fehler beim Laden der Modus-Anfragen:", err));
         }
         
-        // Modus-Anfrage genehmigen
         function approveRequest(username) {
             fetch(`/api/admin/approve_mode_change/${username}`, { method: 'POST' })
                 .then(response => response.json())
@@ -713,7 +730,6 @@
                 });
         }
         
-        // Modus-Anfrage ablehnen
         function rejectRequest(username) {
             fetch(`/api/admin/reject_mode_change/${username}`, { method: 'POST' })
                 .then(response => response.json())
@@ -723,7 +739,6 @@
                 });
         }
         
-        // Lade Audit-Log
         function loadAuditLog() {
             fetch('/api/admin/audit_log')
                 .then(response => response.json())
@@ -746,7 +761,6 @@
                 .catch(err => console.error("Fehler beim Laden des Audit-Logs:", err));
         }
         
-        // Benutzer sperren/entsperren
         function toggleBlock(username) {
             fetch(`/api/admin/user/toggle_block/${username}`, { method: 'POST' })
                 .then(response => response.json())
@@ -809,21 +823,18 @@
         
         function addUser(event) {
             event.preventDefault();
-            // Diese Funktion müsste im Backend implementiert werden
             alert('Benutzer hinzufügen - Backend-Implementation erforderlich');
             closeAddUserModal();
         }
         
-        // Passwort zurücksetzen
         function resetPassword(username) {
-            const newPassword = prompt(`Neues Passwort für ${username}:`);
+            const newPassword = prompt(`Simuliertes Passwort-Reset für ${username}:`);
             if (newPassword) {
-                // Diese Funktion müsste im Backend implementiert werden
                 alert('Passwort-Reset - Backend-Implementation erforderlich');
             }
         }
         
-        // Maintenance-Mode
+        // Maintenance-Mode (LKW-Bot)
         function toggleMaintenance() {
             const enabled = document.getElementById('maintenanceToggle').checked;
             fetch('/api/admin/maintenance', {
@@ -833,13 +844,13 @@
             })
             .then(response => response.json())
             .then(() => {
-                showToastAlert(enabled ? 'Maintenance-Mode aktiviert' : 'Maintenance-Mode deaktiviert', 'warning');
+                showToastAlert(enabled ? 'LKW-Bot Maintenance-Mode aktiviert' : 'LKW-Bot Maintenance-Mode deaktiviert', 'warning');
             });
         }
         
-        // Lade Maintenance-Status
+        // Lade LKW-Bot Maintenance-Status
         function loadMaintenanceStatus() {
-            fetch('/api/status')
+            fetch('/api/status') // LKW-Bot Status-API
                 .then(response => response.json())
                 .then(data => {
                     const toggle = document.getElementById('maintenanceToggle');
@@ -849,25 +860,19 @@
                 });
         }
         
-        // Logs löschen
         function clearLogs() {
-            if (confirm('Wirklich alle Logs löschen?')) {
-                // Diese Funktion müsste im Backend implementiert werden
+            if (confirm('Wirklich alle Logs löschen? (Simuliert)')) {
                 alert('Log-Löschung - Backend-Implementation erforderlich');
-                showToastAlert('Logs gelöscht (simuliert)', 'success');
             }
         }
         
-        // Alle Stats zurücksetzen
         function resetAllStats() {
-            if (confirm('WARNUNG: Wirklich ALLE Statistiken löschen? Dies kann nicht rückgängig gemacht werden!')) {
-                // Diese Funktion müsste im Backend implementiert werden
+            if (confirm('WARNUNG: Wirklich ALLE LKW-Statistiken löschen? (Simuliert)')) {
                 alert('Stats-Reset - Backend-Implementation erforderlich');
-                showToastAlert('Stats zurückgesetzt (simuliert)', 'danger');
             }
         }
         
-        // Toast Alert anzeigen (V1)
+        // Toast Alert anzeigen
         function showToastAlert(message, type) {
             const alert = document.createElement('div');
             alert.style.cssText = `
@@ -887,9 +892,9 @@
             setTimeout(() => alert.remove(), 3000);
         }
 
-        // === V2: SSH Konfiguration ===
+        // === V2: LKW-Bot SSH Konfiguration ===
 
-        // Status Alert anzeigen (V2)
+        // Status Alert anzeigen (für LKW-Bot SSH)
         function showSshAlert(message, type) {
             const statusDiv = document.getElementById('sshStatus');
             if (!statusDiv) return;
@@ -901,7 +906,7 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // SSH Config laden
+        // Lade LKW-Bot SSH Config
         function loadSSHConfig() {
             fetch('/api/admin/ssh_config')
                 .then(r => r.json())
@@ -914,33 +919,23 @@
                     
                     const localPortEl = document.getElementById('localPort');
                     if (localPortEl) {
-                        if (data.local_adb_port) {
-                            localPortEl.textContent = data.local_adb_port;
-                        } else {
-                            localPortEl.textContent = 'Nicht extrahiert';
-                        }
+                        localPortEl.textContent = data.local_adb_port ? data.local_adb_port : 'Nicht extrahiert';
                     }
                     
                     const lastUpdatedEl = document.getElementById('lastUpdated');
                     if (lastUpdatedEl) {
-                        if (data.last_updated) {
-                            const date = new Date(data.last_updated);
-                            lastUpdatedEl.textContent = date.toLocaleString('de-DE');
-                        } else {
-                            lastUpdatedEl.textContent = 'Nie';
-                        }
+                        lastUpdatedEl.textContent = data.last_updated ? new Date(data.last_updated).toLocaleString('de-DE') : 'Nie';
                     }
                     
                     const statusDiv = document.getElementById('sshStatus');
                     if (statusDiv && !statusDiv.innerHTML) { // Nur setzen, wenn kein Alert da ist
                         if (data.ssh_command) {
-                            statusDiv.innerHTML = '<div class="alert alert-success">✅ SSH-Konfiguration vorhanden - Bot ist einsatzbereit!</div>';
+                            statusDiv.innerHTML = '<div class="alert alert-success">✅ LKW-SSH-Konfiguration vorhanden!</div>';
                         } else {
-                            statusDiv.innerHTML = '<div class="alert alert-warning">⚠️ Keine SSH-Konfiguration - Bitte konfigurieren um den Bot zu starten</div>';
+                            statusDiv.innerHTML = '<div class="alert alert-warning">⚠️ Keine LKW-SSH-Konfiguration!</div>';
                         }
                     }
                     
-                    // Auto-extract local port when SSH command changes
                     if (sshCmdEl) {
                         sshCmdEl.addEventListener('input', function() {
                             const cmd = this.value;
@@ -952,60 +947,53 @@
                     }
                 })
                 .catch(err => {
-                    console.error('Fehler beim Laden der SSH-Config:', err);
-                    showSshAlert('Fehler beim Laden der Konfiguration', 'error');
+                    console.error('Fehler beim Laden der LKW-SSH-Config:', err);
+                    showSshAlert('Fehler beim Laden der LKW-Konfiguration', 'error');
                 });
         }
 
-        // SSH Config speichern
-        const sshForm = document.getElementById('sshConfigForm');
-        if (sshForm) {
-            sshForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const data = {
-                    ssh_command: document.getElementById('sshCommand').value.trim(),
-                    ssh_password: document.getElementById('sshPassword').value.trim()
-                };
-                
-                if (!data.ssh_command) {
-                    showSshAlert('SSH-Command ist erforderlich!', 'error');
-                    return;
+        // Speichere LKW-Bot SSH Config
+        function saveSshConfig(e) {
+            e.preventDefault();
+            
+            const data = {
+                ssh_command: document.getElementById('sshCommand').value.trim(),
+                ssh_password: document.getElementById('sshPassword').value.trim()
+            };
+            
+            if (!data.ssh_command) {
+                showSshAlert('SSH-Command ist erforderlich!', 'error');
+                return;
+            }
+            
+            fetch('/api/admin/ssh_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) {
+                    showSshAlert('✅ LKW-SSH-Konfiguration erfolgreich gespeichert!', 'success');
+                    loadSSHConfig();
+                } else {
+                    showSshAlert('❌ Fehler: ' + (result.error || 'Unbekannter Fehler'), 'error');
                 }
-                
-                if (!data.ssh_command.includes('ssh') || !data.ssh_command.includes('-L')) {
-                    showSshAlert('Ungültiger SSH-Command! Bitte vollständigen Command eingeben.', 'error');
-                    return;
-                }
-                
-                fetch('/api/admin/ssh_config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                })
-                .then(r => r.json())
-                .then(result => {
-                    if (result.success) {
-                        showSshAlert('✅ SSH-Konfiguration erfolgreich gespeichert!', 'success');
-                        loadSSHConfig();
-                    } else {
-                        showSshAlert('❌ Fehler: ' + (result.error || 'Unbekannter Fehler'), 'error');
-                    }
-                })
-                .catch(err => {
-                    showSshAlert('❌ Fehler beim Speichern: ' + err.message, 'error');
-                });
+            })
+            .catch(err => {
+                showSshAlert('❌ Fehler beim Speichern: ' + err.message, 'error');
             });
         }
 
-        // SSH-Verbindung testen
+        // Teste LKW-Bot SSH-Verbindung
         function testSSH() {
             const loadingEl = document.getElementById('loading');
             const formEl = document.getElementById('sshConfigForm');
             
             if (loadingEl) loadingEl.style.display = 'block';
             if (formEl) formEl.style.display = 'none';
-            
+            showSshAlert('Teste LKW-Verbindung...', 'info');
+
             fetch('/api/admin/test_ssh', { method: 'POST' })
             .then(r => r.json())
             .then(result => {
@@ -1028,7 +1016,6 @@
         
         // === Initiales Laden & Intervalle ===
         
-        // Initial laden
         document.addEventListener('DOMContentLoaded', () => {
             loadUsers();
             loadModeRequests();
@@ -1037,7 +1024,7 @@
             loadSSHConfig();
         });
         
-        // Auto-Refresh alle 5 Sekunden (nur für dynamische Daten)
+        // Auto-Refresh
         setInterval(() => {
             loadModeRequests();
             loadAuditLog();
@@ -1052,4 +1039,3 @@
     </script>
 </body>
 </html>
-

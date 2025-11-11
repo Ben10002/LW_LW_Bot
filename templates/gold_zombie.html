@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold-Zombie-Bot</title>
+    <style>
+        /* (CSS aus deinem Admin-Panel, leicht angepasst) */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: white; padding: 20px 30px; border-radius: 15px;
+            margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h1 { color: #667eea; font-size: 28px; }
+        .header-actions { display: flex; gap: 15px; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 600; text-decoration: none;
+            display: inline-block; transition: all 0.3s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; transform: translateY(-2px); }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; transform: translateY(-2px); }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; transform: translateY(-2px); }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn[disabled] { background: #ccc; cursor: not-allowed; transform: none; }
+        
+        .card {
+            background: white; padding: 25px; border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #667eea; margin-bottom: 20px; font-size: 20px;
+            border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        /* Status Boxen */
+        .stat-box {
+            background: #f8f9fa; padding: 20px; border-radius: 10px;
+            border: 1px solid #e0e0e0; text-align: center;
+        }
+        .stat-label { font-size: 14px; color: #6c757d; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 600; color: #667eea; }
+        .stat-value.status-running { color: #28a745; }
+        .stat-value.status-stopped { color: #dc3545; }
+        .stat-value.status-paused { color: #ffc107; }
+
+        /* Formulare */
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block; margin-bottom: 8px; font-weight: 600; color: #555;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="number"],
+        .form-group textarea {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 14px;
+        }
+        .form-group textarea { font-family: 'Monaco', monospace; resize: vertical; }
+        .form-group small { color: #6c757d; font-size: 12px; display: block; margin-top: 5px; }
+
+        /* Checkbox-Gruppe */
+        .checkbox-group { display: flex; gap: 20px; align-items: center; margin-top: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; }
+        .checkbox-item label { margin-bottom: 0; }
+        .checkbox-item input[type="checkbox"] { width: 18px; height: 18px; }
+
+        /* Alert Boxen */
+        .alert {
+            padding: 15px; border-radius: 8px; margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out; display: none;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🧟 Gold-Zombie-Bot</h1>
+                <small style="color: #6c757d;">Automatisches Farmen von Gold-Zombies</small>
+            </div>
+            <div class="header-actions">
+                {% if user.role == 'admin' %}
+                    <a href="{{ url_for('admin') }}" class="btn btn-secondary">🛡️ Admin</a>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">🚛 LKW-Bot</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Abmelden</a>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stat-box">
+                <div class="stat-label">Bot-Status</div>
+                <div class="stat-value status-stopped" id="statusLabel">Gestoppt</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ADB-Verbindung</div>
+                <div class="stat-value status-stopped" id="adbLabel">Getrennt</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Laufzeit</div>
+                <div class="stat-value" id="runtimeLabel">00:00:00</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Zombies getötet</div>
+                <div class="stat-value" id="deployedLabel">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">50er Ausdauer</div>
+                <div class="stat-value" id="used50Label">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">10er Ausdauer</div>
+                <div class="stat-value" id="used10Label">0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Bot-Steuerung</h2>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button class="btn btn-success" id="btnStart" onclick="startBot()">▶️ START</button>
+                <button class="btn btn-warning" id="btnPause" onclick="pauseBot()" disabled>⏸️ PAUSE</button>
+                <button class="btn btn-danger" id="btnStop" onclick="stopBot()" disabled>⏹️ STOP</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Einstellungen</h2>
+            <div id="alertBox" class="alert"></div>
+
+            <form id="settingsForm" onsubmit="saveSettings(event)">
+                <div class="form-group">
+                    <label>🪖 Truppen-Auswahl</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="use_trupp_1">
+                            <label for="use_trupp_1">Truppe 1</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="use_trupp_2" checked>
+                            <label for="use_trupp_2">Truppe 2</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="use_trupp_3" checked>
+                            <label for="use_trupp_3">Truppe 3</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>⚙️ Ausdauer-Einstellungen</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <label for="stamina_50">50 Ausdauer (wie oft)</label>
+                            <input type="number" id="stamina_50" value="0" min="0">
+                        </div>
+                        <div>
+                            <label for="stamina_10">10 Ausdauer (wie oft)</label>
+                            <input type="number" id="stamina_10" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="checkbox-group" style="margin-top: 15px;">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="unlimited" onchange="toggleUnlimited()">
+                            <label for="unlimited">♾️ Unbegrenzt (ignoriert Limits, nutzt je 1x 50+10 pro Durchlauf)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sshCommand">🔐 SSH-Command (Nur für Zombie-Bot)</label>
+                    <textarea id="sshCommand" rows="3" placeholder="ssh -oHostKeyAlgorithms=+ssh-rsa USER@HOST -p PORT -L ..."></textarea>
+                    <small>Dieser Befehl ist NUR für den Gold-Zombie-Bot und wird separat gespeichert.</small>
+                </div>
+                <div class="form-group">
+                    <label for="sshPassword">🔑 Connection Key / Passwort (Nur für Zombie-Bot)</label>
+                    <input type="password" id="sshPassword" placeholder="VMOSCloud Connection Key hier einfügen">
+                </div>
+                <div class="form-group" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="submit" class="btn btn-primary">💾 Speichern</button>
+                    <button type="button" class="btn btn-secondary" onclick="testSSH()">🔌 Verbindung testen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let isPaused = false;
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
+        }
+
+        function toggleUnlimited() {
+            const unlimited = document.getElementById('unlimited').checked;
+            document.getElementById('stamina_50').disabled = unlimited;
+            document.getElementById('stamina_10').disabled = unlimited;
+        }
+
+        function updateStatus(data) {
+            const statusLabel = document.getElementById('statusLabel');
+            const adbLabel = document.getElementById('adbLabel');
+            
+            // Bot-Status
+            if (data.running) {
+                if (data.paused) {
+                    statusLabel.textContent = "Pausiert";
+                    statusLabel.className = "stat-value status-paused";
+                    document.getElementById('btnPause').textContent = "▶️ Fortsetzen";
+                    isPaused = true;
+                } else {
+                    statusLabel.textContent = "Läuft";
+                    statusLabel.className = "stat-value status-running";
+                    document.getElementById('btnPause').textContent = "⏸️ PAUSE";
+                    isPaused = false;
+                }
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnPause').disabled = false;
+                document.getElementById('btnStop').disabled = false;
+            } else {
+                statusLabel.textContent = "Gestoppt";
+                statusLabel.className = "stat-value status-stopped";
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnPause').disabled = true;
+                document.getElementById('btnPause').textContent = "⏸️ PAUSE";
+                document.getElementById('btnStop').disabled = true;
+                isPaused = false;
+            }
+            
+            // ADB-Status
+            if (data.adb_connected) {
+                adbLabel.textContent = "Verbunden";
+                adbLabel.className = "stat-value status-running";
+            } else {
+                adbLabel.textContent = "Getrennt";
+                adbLabel.className = "stat-value status-stopped";
+            }
+            
+            // Zähler
+            document.getElementById('runtimeLabel').textContent = data.runtime || "00:00:00";
+            document.getElementById('deployedLabel').textContent = data.deployed || 0;
+            document.getElementById('used50Label').textContent = data.used_50 || 0;
+            document.getElementById('used10Label').textContent = data.used_10 || 0;
+        }
+
+        function loadStatus() {
+            fetch('/api/gold_zombies/status')
+                .then(r => r.json())
+                .then(data => updateStatus(data));
+        }
+
+        function loadSettings() {
+            fetch('/api/gold_zombies/settings')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('use_trupp_1').checked = data.use_trupp_1;
+                    document.getElementById('use_trupp_2').checked = data.use_trupp_2;
+                    document.getElementById('use_trupp_3').checked = data.use_trupp_3;
+                    document.getElementById('stamina_50').value = data.stamina_50;
+                    document.getElementById('stamina_10').value = data.stamina_10;
+                    document.getElementById('unlimited').checked = data.unlimited;
+                    document.getElementById('sshCommand').value = data.ssh_command || '';
+                    document.getElementById('sshPassword').value = data.ssh_password || '';
+                    toggleUnlimited();
+                });
+        }
+
+        function saveSettings(event) {
+            event.preventDefault();
+            const data = {
+                use_trupp_1: document.getElementById('use_trupp_1').checked,
+                use_trupp_2: document.getElementById('use_trupp_2').checked,
+                use_trupp_3: document.getElementById('use_trupp_3').checked,
+                stamina_50: document.getElementById('stamina_50').value,
+                stamina_10: document.getElementById('stamina_10').value,
+                unlimited: document.getElementById('unlimited').checked,
+                ssh_command: document.getElementById('sshCommand').value,
+                ssh_password: document.getElementById('sshPassword').value
+            };
+
+            fetch('/api/gold_zombies/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    showAlert('Einstellungen und SSH-Daten gespeichert!', 'success');
+                } else {
+                    showAlert(`Fehler: ${response.error}`, 'error');
+                }
+            });
+        }
+
+        function startBot() {
+            // Speichere zuerst die Einstellungen
+            saveSettings(new Event('submit'));
+            
+            // Kurze Verzögerung, damit Speichern verarbeitet wird
+            setTimeout(() => {
+                fetch('/api/gold_zombies/start', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(response => {
+                        if (response.success) {
+                            showAlert('Zombie-Bot gestartet!', 'success');
+                            loadStatus();
+                        } else {
+                            showAlert(`Fehler beim Starten: ${response.error}`, 'error');
+                        }
+                    });
+            }, 500);
+        }
+
+        function pauseBot() {
+            fetch('/api/gold_zombies/pause', { method: 'POST' })
+                .then(r => r.json())
+                .then(() => {
+                    showAlert(isPaused ? 'Bot fortgesetzt!' : 'Bot pausiert!', 'warning');
+                    loadStatus();
+                });
+        }
+
+        function stopBot() {
+            if (confirm('Willst du den Zombie-Bot wirklich stoppen?')) {
+                fetch('/api/gold_zombies/stop', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(() => {
+                        showAlert('Bot gestoppt!', 'error');
+                        loadStatus();
+                    });
+            }
+        }
+        
+        function testSSH() {
+            showAlert('Teste SSH-Verbindung... (kann 10-15s dauern)', 'warning');
+            saveSettings(new Event('submit')); // Erst speichern
+
+            setTimeout(() => {
+                fetch('/api/gold_zombies/test_ssh', { method: 'POST' })
+                .then(r => r.json())
+                .then(response => {
+                    if (response.success) {
+                        showAlert(response.message, 'success');
+                    } else {
+                        showAlert(response.message, 'error');
+                    }
+                    loadStatus(); // ADB-Status aktualisieren
+                });
+            }, 500);
+        }
+
+        // Initiales Laden
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadStatus();
+            setInterval(loadStatus, 3000); // Alle 3 Sek. Status aktualisieren
+        });
+    </script>
+</body>
+</html>

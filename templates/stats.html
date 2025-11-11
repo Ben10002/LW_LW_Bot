@@ -7,89 +7,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            min-height: 100vh; 
-            padding: 20px; 
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .header { 
-            background: white; 
-            padding: 20px 30px; 
-            border-radius: 15px; 
-            margin-bottom: 20px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-        }
-        .btn { 
-            padding: 10px 20px; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-size: 14px; 
-            font-weight: 600; 
-            text-decoration: none; 
-            display: inline-block; 
-            transition: all 0.3s; 
-        }
+        .header { background: white; padding: 20px 30px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.3s; }
         .btn-secondary { background: #6c757d; color: white; }
-        .btn-secondary:hover { background: #5a6268; }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-primary:hover { background: #5568d3; }
-        
-        .card { 
-            background: white; 
-            padding: 25px; 
-            border-radius: 15px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-            margin-bottom: 20px; 
-        }
-        .card h2 {
-            color: #667eea;
-            margin-bottom: 20px;
-            font-size: 20px;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 10px;
-        }
-
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #495057; }
-        .form-group input[type="date"] { 
-            width: 100%;
-            padding: 10px; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 8px; 
-            font-size: 14px; 
-        }
-
-        .stats-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-            gap: 15px; 
-        }
-        
-        /* === Überarbeitetes Stat-Box-Design === */
-        .stat-box { 
-            background: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            color: #495057; 
-            padding: 20px; 
-            border-radius: 10px; 
-            text-align: center; 
-        }
-        .stat-value { 
-            font-size: 32px; 
-            font-weight: bold; 
-            margin-bottom: 5px; 
-            color: #667eea; /* Theme-Farbe */
-        }
-        .stat-label { 
-            font-size: 14px; 
-            color: #6c757d; /* Abgedunkelt */
-        }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input { padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .stat-label { font-size: 14px; opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -105,60 +35,57 @@
         </div>
         
         <div class="card">
-            <h2>Zeitraum wählen</h2>
-            <div style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 150px;">
-                    <label for="startDate">Von:</label>
+            <h2 style="margin-bottom: 20px;">Zeitraum wählen</h2>
+            <div style="display: flex; gap: 15px; align-items: end;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Von:</label>
                     <input type="date" id="startDate">
                 </div>
-                <div class="form-group" style="flex: 1; min-width: 150px;">
-                    <label for="endDate">Bis:</label>
+                <div class="form-group" style="flex: 1;">
+                    <label>Bis:</label>
                     <input type="date" id="endDate">
                 </div>
-                <button class="btn btn-primary" style="height: 42px;" onclick="loadStats()">📈 Laden</button>
+                <button class="btn" style="background: #667eea; color: white;" onclick="loadStats()">📈 Laden</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="totalTrucks">0</div>
+                <div class="stat-label">Gesamt LKWs</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="avgStrength">0</div>
+                <div class="stat-label">Ø Stärke (M)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="maxStrength">0</div>
+                <div class="stat-label">Max Stärke (M)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="uniqueServers">0</div>
+                <div class="stat-label">Server</div>
             </div>
         </div>
         
         <div class="card">
-            <h2>Statistik-Übersicht</h2>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value" id="totalTrucks">0</div>
-                    <div class="stat-label">Gesamt LKWs</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="avgStrength">0</div>
-                    <div class="stat-label">Ø Stärke (M)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="maxStrength">0</div>
-                    <div class="stat-label">Max Stärke (M)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="uniqueServers">0</div>
-                    <div class="stat-label">Server</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h2>Stärke-Verteilung</h2>
+            <h2 style="margin-bottom: 20px;">Stärke-Verteilung</h2>
             <canvas id="strengthChart"></canvas>
         </div>
         
         <div class="card">
-            <h2>LKWs pro Tag</h2>
+            <h2 style="margin-bottom: 20px;">LKWs pro Tag</h2>
             <canvas id="dailyChart"></canvas>
         </div>
         
         <div class="card">
-            <h2>Top Server</h2>
+            <h2 style="margin-bottom: 20px;">Top Server</h2>
             <canvas id="serverChart"></canvas>
         </div>
     </div>
     
     <script>
-        // Standard: 7 Tage bis Heute
+        // Standard: Heute
         const today = new Date().toISOString().split('T')[0];
         const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
         document.getElementById('startDate').value = weekAgo;
@@ -170,12 +97,6 @@
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
             
-            // Lade-Status (optional, aber gut für UX)
-            document.getElementById('totalTrucks').textContent = '...';
-            document.getElementById('avgStrength').textContent = '...';
-            document.getElementById('maxStrength').textContent = '...';
-            document.getElementById('uniqueServers').textContent = '...';
-
             fetch(`/api/admin/stats?start=${start}T00:00:00&end=${end}T23:59:59`)
                 .then(r => r.json())
                 .then(data => {
@@ -194,18 +115,9 @@
                         document.getElementById('maxStrength').textContent = max;
                         document.getElementById('uniqueServers').textContent = servers;
                         
+                        // Charts
                         updateCharts(trucks);
-                    } else {
-                        // Reset Stats, wenn keine Daten
-                        document.getElementById('avgStrength').textContent = 0;
-                        document.getElementById('maxStrength').textContent = 0;
-                        document.getElementById('uniqueServers').textContent = 0;
-                        updateCharts([]); // Charts leeren
                     }
-                })
-                .catch(err => {
-                    console.error("Fehler beim Laden der Stats:", err);
-                    alert("Fehler beim Laden der Statistiken.");
                 });
         }
         
@@ -245,8 +157,6 @@
                         label: 'LKWs pro Tag',
                         data: Object.values(daily),
                         borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        fill: true,
                         tension: 0.4
                     }]
                 }
@@ -272,7 +182,7 @@
         }
         
         // Initial laden
-        document.addEventListener('DOMContentLoaded', loadStats);
+        loadStats();
     </script>
 </body>
 </html>
