@@ -23,10 +23,10 @@
         .btn-primary { background: #667eea; color: white; }
         .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
         .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #5a6268; transform: translateY(-2px); box-shadow: 0 5px 10px rgba(0,0,0,0.2); } /* ANimation hinzugefügt */
         .btn-danger { background: #dc3545; color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #000; }
-        .btn-control { flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.3s; }
         .btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; overflow-x: auto; }
@@ -38,9 +38,23 @@
         .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #dc3545; animation: pulse 2s infinite; }
         .status-dot.connected { background: #28a745; }
         .control-buttons { display: flex; gap: 15px; margin: 20px 0; }
+        
+        .btn-control { 
+            flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; 
+            transition: all 0.3s; /* Basis Transition */
+        }
+
+        /* ANimation für Control Buttons */
+        .btn-control:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2); 
+        }
         .btn-start { background: #28a745; color: white; }
+        .btn-start:hover:not(:disabled) { background: #218838; } /* Dunklerer Ton */
         .btn-pause { background: #ffc107; color: #000; }
+        .btn-pause:hover:not(:disabled) { background: #e0a800; }
         .btn-stop { background: #dc3545; color: white; }
+        .btn-stop:hover:not(:disabled) { background: #c82333; }
         
         /* Stats Boxen */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; }
@@ -56,31 +70,22 @@
         .form-group textarea { font-family: monospace; resize: vertical; }
         
         /* Korrigierte Truppen-Auswahl */
-        .checkbox-group { 
-            display: flex; 
-            gap: 30px; 
-            align-items: flex-start;
-            padding-top: 5px;
+        .checkbox-group { display: flex; gap: 30px; align-items: flex-start; padding-top: 5px; }
+        .troop-item { display: flex; flex-direction: column; align-items: center; }
+        .troop-item label { margin-bottom: 5px !important; color: #495057; font-size: 15px; font-weight: 600; }
+        .troop-item input[type="checkbox"] { width: 20px; height: 20px; margin-top: 0; }
+        
+        /* Speichern Button mit Animation */
+        .btn-save { 
+            width: 100%; padding: 12px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; border: none; border-radius: 8px; font-weight: 600; 
+            cursor: pointer; transition: all 0.3s; 
         }
-        .troop-item {
-            display: flex;
-            flex-direction: column; 
-            align-items: center; 
+        .btn-save:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
         }
-        .troop-item label {
-            margin-bottom: 5px !important; 
-            color: #495057;
-            font-size: 15px;
-            font-weight: 600;
-        }
-        .troop-item input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            margin-top: 0;
-        }
-        /* Ende Korrektur */
-
-        .btn-save { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
 
         .log-output { background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #495057; }
         .log-entry { margin-bottom: 5px; border-bottom: 1px dotted #e9ecef; }
@@ -101,10 +106,10 @@
             </div>
             <div class="header-actions">
                 {% if user.role == 'admin' %}
-                    <a href="{{ url_for('admin') }}" class="btn btn-secondary">🛡️ Admin</a>
+                    <a href="/admin" class="btn btn-secondary">🛡️ Admin</a>
                 {% endif %}
-                <a href="{{ url_for('index') }}" class="btn btn-primary">🚛 LKW-Bot</a>
-                <a href="{{ url_for('logout') }}" class="btn btn-danger">Abmelden</a>
+                <a href="/index" class="btn btn-primary">🚛 LKW-Bot</a>
+                <a href="/logout" class="btn btn-danger">Abmelden</a>
             </div>
         </div>
 
