@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gold-Zombie-Bot</title>
     <style>
-        /* CSS für Konsistenz */
+        /* CSS aus deinem LKW-Dashboard für Konsistenz */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -13,177 +13,167 @@
             min-height: 100vh;
             padding: 20px;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 800px; margin: 0 auto; }
         .header { background: white; padding: 20px 30px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
         .header h1 { color: #667eea; font-size: 28px; }
         .header-actions { display: flex; gap: 15px; flex-wrap: wrap; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.3s; }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-warning { background: #ffc107; color: #000; }
-        .btn[disabled] { background: #ccc; cursor: not-allowed; transform: none; }
-
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; overflow-x: auto; }
+        
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .card h2 { color: #667eea; margin-bottom: 20px; font-size: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
         
-        /* Neue Styles für Status Grid (kompakt wie LKW-Bot) */
-        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; text-align: center; }
-        .status-item { padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff; background: #5568d3; }
-        .status-info { color: #fff; font-size: 10px; opacity: 0.8; }
+        /* Status und Control Buttons */
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        .status-item { display: flex; align-items: center; gap: 10px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #dc3545; animation: pulse 2s infinite; }
+        .status-dot.connected { background: #28a745; }
+        .control-buttons { display: flex; gap: 15px; margin: 20px 0; }
+        .btn { padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; flex: 1; transition: all 0.3s; }
+        .btn-start { background: #28a745; color: white; }
+        .btn-pause { background: #ffc107; color: #000; }
+        .btn-stop { background: #dc3545; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        .form-group input, .form-group textarea { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
-        .form-group textarea { font-family: 'Monaco', monospace; resize: vertical; }
-        .form-group small { color: #6c757d; font-size: 12px; display: block; margin-top: 5px; }
-        .checkbox-group { display: flex; gap: 20px; align-items: center; margin-top: 10px; }
-        .checkbox-item { display: flex; align-items: center; gap: 8px; }
-        
-        /* Log-Stile */
-        .audit-log { max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; }
-        .audit-entry { padding: 5px 0; border-bottom: 1px dotted #e0e0e0; font-size: 13px; font-family: 'Monaco', monospace; color: #495057; }
-        .audit-entry:last-child { border-bottom: none; }
+        /* Stats Boxen */
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; }
+        .stat-box { padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; }
+        .stat-value { font-size: 28px; font-weight: bold; margin-bottom: 5px; }
+        .stat-label { font-size: 12px; opacity: 0.9; }
 
-        /* Buttons */
-        .control-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        /* Formulare */
+        .row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #495057; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .btn-save { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        
+        /* Log Output Style */
+        .log-output { background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #495057; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dotted #e9ecef; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div>
+            <div class="header-left">
                 <h1>🧟 Gold-Zombie-Bot</h1>
-                <small style="color: #6c757d;">Automatisches Farmen von Gold-Zombies</small>
+                <div class="subtitle">VMOSCloud Edition</div>
             </div>
-            <div class="header-actions">
-                {% if user.role == 'admin' %}
-                    <a href="{{ url_for('admin') }}" class="btn btn-secondary">🛡️ Admin</a>
-                {% endif %}
-                <a href="{{ url_for('index') }}" class="btn btn-primary">🚛 LKW-Bot</a>
-                <a href="{{ url_for('logout') }}" class="btn btn-danger">Abmelden</a>
+            <div class="header-right">
+                <a href="/admin" class="btn-admin">🛡️ Admin</a>
+                <a href="/index" class="btn-admin" style="background: #667eea;">🚛 LKW-Bot</a>
+                <a href="/logout" class="btn-logout">Abmelden</a>
             </div>
         </div>
 
         <div class="card">
+            <h2>📊 Status</h2>
             <div class="status-grid">
-                <div class="status-item" style="background: #007bff;">
-                    <div id="statusLabel">Gestoppt</div>
-                    <div class="status-info">Bot-Status</div>
+                <div class="status-item">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span>Status: <strong id="statusText">Gestoppt</strong></span>
                 </div>
-                <div class="status-item" style="background: #dc3545;">
-                    <div id="adbLabel">Getrennt</div>
-                    <div class="status-info">ADB-Verbindung</div>
-                </div>
-                <div class="status-item" style="background: #28a745;">
-                    <div id="runtimeLabel">00:00:00</div>
-                    <div class="status-info">Laufzeit</div>
-                </div>
-                <div class="status-item" style="background: #ffc107; color: #000;">
-                    <div id="deployedLabel">0</div>
-                    <div class="status-info">Zombies getötet</div>
+                <div class="status-item">
+                    <div class="status-dot" id="adbDot"></div>
+                    <span id="adbStatus">ADB: Getrennt</span>
                 </div>
             </div>
-
-            <div class="control-group">
-                <button class="btn btn-success" id="btnStart" onclick="startBot()">▶️ START</button>
-                <button class="btn btn-warning" id="btnPause" onclick="pauseBot()" disabled>⏸️ PAUSE</button>
-                <button class="btn btn-danger" id="btnStop" onclick="stopBot()" disabled>⏹️ STOP</button>
+            <div class="status-item" style="margin-top: 10px;">
+                <span>Letzte Aktion: <strong id="lastAction">-</strong></span>
+            </div>
+            
+            <div class="control-buttons">
+                <button id="btnStart" class="btn btn-start" onclick="startBot()">▶️ START</button>
+                <button id="btnPause" class="btn btn-pause" onclick="pauseBot()" disabled>⏸️ PAUSE</button>
+                <button id="btnStop" class="btn btn-stop" onclick="stopBot()" disabled>⏹️ STOP</button>
             </div>
         </div>
-
+        
         <div class="card">
-            <h2>Einstellungen</h2>
-            <div id="alertBox" class="alert"></div>
+            <h2>📈 Statistiken</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="runtimeLabel">00:00:00</div>
+                    <div class="stat-label">Laufzeit</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="deployedLabel">0</div>
+                    <div class="stat-label">Zombies getötet</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="staminaUsedLabel">0 / 0</div>
+                    <div class="stat-label">Ausdauer verwendet (50er/10er)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>⚙️ Einstellungen</h2>
+            <div id="alerts" class="alert"></div>
 
             <form id="settingsForm" onsubmit="saveSettings(event)">
-                <div class="form-grid">
-                    <div style="border-right: 1px solid #f0f0f0; padding-right: 20px;">
-                        <div class="form-group">
-                            <label>🪖 Truppen-Auswahl</label>
-                            <div class="checkbox-group">
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="use_trupp_1">
-                                    <label for="use_trupp_1">Truppe 1</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="use_trupp_2" checked>
-                                    <label for="use_trupp_2">Truppe 2</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="use_trupp_3" checked>
-                                    <label for="use_trupp_3">Truppe 3</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>⚙️ Ausdauer-Limits</label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <div>
-                                    <label for="stamina_50">50 Ausdauer (max.)</label>
-                                    <input type="number" id="stamina_50" value="0" min="0">
-                                </div>
-                                <div>
-                                    <label for="stamina_10">10 Ausdauer (max.)</label>
-                                    <input type="number" id="stamina_10" value="0" min="0">
-                                </div>
-                            </div>
-                            <div class="checkbox-group" style="margin-top: 15px;">
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="unlimited" onchange="toggleUnlimited()">
-                                    <label for="unlimited">♾️ Unbegrenzt</label>
-                                </div>
-                            </div>
-                            <small style="margin-top: 10px;">Verbraucht: 50er (<span id="used50Label">0</span>) | 10er (<span id="used10Label">0</span>)</small>
-                        </div>
-                    </div>
-                    
-                    <div style="padding-left: 20px;">
-                         <div class="form-group">
-                            <label for="sshCommand">🔐 Command * (Nur für diesen Bot)</label>
-                            <textarea id="sshCommand" rows="3" placeholder="ssh -oHostKeyAlgorithms=+ssh-rsa USER@HOST -p PORT -L LOCAL_PORT:adb-proxy:REMOTE_PORT -Nf"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="sshPassword">🔑 Connection Key / Passwort</label>
-                            <input type="password" id="sshPassword" placeholder="VMOSCloud Connection Key hier einfügen">
-                        </div>
-                        <div class="config-info">
-                            <div class="config-info-item">
-                                <span class="config-info-label">Letzte Aktualisierung:</span>
-                                <span class="config-info-value" id="lastUpdated">Nie</span>
-                            </div>
-                        </div>
-                        <div class="control-group" style="margin-top: 20px;">
-                            <button type="submit" class="btn btn-primary">💾 Speichern</button>
-                            <button type="button" class="btn btn-secondary" onclick="testSSH()">🔌 Verbindung testen</button>
-                        </div>
+                
+                <div class="form-group">
+                    <label>🪖 Truppen-Auswahl</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="use_trupp_1"><label for="use_trupp_1">Truppe 1</label>
+                        <input type="checkbox" id="use_trupp_2" checked><label for="use_trupp_2">Truppe 2</label>
+                        <input type="checkbox" id="use_trupp_3" checked><label for="use_trupp_3">Truppe 3</label>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label for="stamina_50">Max. 50 Ausdauer:</label>
+                        <input type="number" id="stamina_50" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="stamina_10">Max. 10 Ausdauer:</label>
+                        <input type="number" id="stamina_10" value="0" min="0">
+                    </div>
+                </div>
+                
+                <div class="checkbox-group" style="margin-top: -10px; margin-bottom: 20px;">
+                    <input type="checkbox" id="unlimited" onchange="toggleUnlimited()">
+                    <label for="unlimited">♾️ Unbegrenzt</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="sshCommand">🔐 Command * (Nur für diesen Bot)</label>
+                    <textarea id="sshCommand" rows="3" placeholder="ssh -oHostKeyAlgorithms=+ssh-rsa USER@HOST -p PORT -L LOCAL_PORT:adb-proxy:REMOTE_PORT -Nf"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="sshPassword">🔑 Connection Key / Passwort</label>
+                    <input type="password" id="sshPassword" placeholder="VMOSCloud Connection Key hier einfügen">
+                </div>
+                
+                <button type="submit" class="btn-save">💾 Einstellungen speichern</button>
+                <button type="button" class="btn btn-secondary" style="margin-top: 10px; width: 100%;" onclick="testSSH()">🔌 Verbindung testen</button>
             </form>
         </div>
-
+        
         <div class="card">
-            <h2>📋 Bot-Log</h2>
-            <div class="audit-log" id="auditLog">
-                <div class="audit-entry">Lade Log-Daten...</div>
+            <h2>📋 Letzte Bot-Aktion</h2>
+            <div id="logOutput" class="log-output">
+                Warte auf Start...
             </div>
         </div>
+
     </div>
 
     <script>
         let isPaused = false;
-
-        function showAlert(message, type) {
-            const alertBox = document.getElementById('alertBox');
-            alertBox.textContent = message;
-            alertBox.className = `alert alert-${type}`;
-            alertBox.style.display = 'block';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            setTimeout(() => { alertBox.style.display = 'none'; }, 5000);
+        
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type} show`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 4000);
         }
 
         function toggleUnlimited() {
@@ -193,55 +183,61 @@
         }
 
         function updateStatus(data) {
-            const statusLabel = document.getElementById('statusLabel');
-            const adbLabel = document.getElementById('adbLabel');
+            const statusText = document.getElementById('statusText');
+            const statusDot = document.getElementById('statusDot');
+            const adbStatus = document.getElementById('adbStatus');
+            const adbDot = document.getElementById('adbDot');
             
             // Bot-Status
             if (data.running) {
                 if (data.paused) {
-                    statusLabel.textContent = "Pausiert";
-                    statusLabel.style.backgroundColor = '#ffc107';
-                    statusLabel.style.color = '#000';
-                    document.getElementById('btnPause').textContent = "▶️ Fortsetzen";
+                    statusText.textContent = 'Pausiert';
+                    statusDot.style.background = '#ffc107';
+                    document.getElementById('btnPause').textContent = '▶️ Fortsetzen';
                     isPaused = true;
                 } else {
-                    statusLabel.textContent = data.status || "Läuft";
-                    statusLabel.style.backgroundColor = '#28a745';
-                    statusLabel.style.color = '#fff';
-                    document.getElementById('btnPause').textContent = "⏸️ PAUSE";
+                    statusText.textContent = 'Läuft';
+                    statusDot.style.background = '#28a745';
+                    document.getElementById('btnPause').textContent = '⏸️ PAUSE';
                     isPaused = false;
                 }
                 document.getElementById('btnStart').disabled = true;
                 document.getElementById('btnPause').disabled = false;
                 document.getElementById('btnStop').disabled = false;
             } else {
-                statusLabel.textContent = "Gestoppt";
-                statusLabel.style.backgroundColor = '#dc3545';
-                statusLabel.style.color = '#fff';
+                statusText.textContent = 'Gestoppt';
+                statusDot.style.background = '#dc3545';
                 document.getElementById('btnStart').disabled = false;
                 document.getElementById('btnPause').disabled = true;
-                document.getElementById('btnPause').textContent = "⏸️ PAUSE";
                 document.getElementById('btnStop').disabled = true;
                 isPaused = false;
             }
             
             // ADB-Status
             if (data.adb_connected) {
-                adbLabel.textContent = "Verbunden";
-                adbLabel.style.backgroundColor = '#28a745';
-                adbLabel.style.color = '#fff';
+                adbStatus.textContent = 'ADB: Verbunden';
+                adbDot.classList.add('connected');
             } else {
-                adbLabel.textContent = "Getrennt";
-                adbLabel.style.backgroundColor = '#dc3545';
-                adbLabel.style.color = '#fff';
+                adbStatus.textContent = 'ADB: Getrennt';
+                adbDot.classList.remove('connected');
             }
             
-            // Zähler (Limits werden über loadSettings geladen)
+            // Log Output (Letzte Aktion)
+            const logOutput = document.getElementById('logOutput');
+            const lastActionText = data.status && data.status.includes('Warte auf Trupp') ? data.status : data.status.includes('SSH-Konfig fehlt') ? data.status : data.status.includes('SSH-Fehler') ? data.status : data.status || data.last_action;
+
+            document.getElementById('lastAction').textContent = lastActionText.replace('Zombie-Bot: ', '');
+
+            // Zähler
             document.getElementById('runtimeLabel').textContent = data.runtime || "00:00:00";
             document.getElementById('deployedLabel').textContent = data.deployed || 0;
             
-            document.getElementById('used50Label').textContent = `${data.used_50 || 0}`;
-            document.getElementById('used10Label').textContent = `${data.used_10 || 0}`;
+            const limit50 = document.getElementById('stamina_50').value;
+            const limit10 = document.getElementById('stamina_10').value;
+            const unlimited = document.getElementById('unlimited').checked;
+            
+            document.getElementById('staminaUsedLabel').textContent = 
+                `${data.used_50 || 0} / ${unlimited ? '∞' : limit50} | ${data.used_10 || 0} / ${unlimited ? '∞' : limit10}`;
         }
 
         function loadStatus() {
@@ -249,31 +245,6 @@
                 .then(r => r.json())
                 .then(data => updateStatus(data))
                 .catch(err => console.error("Fehler beim Laden des Zombie-Bot Status:", err));
-        }
-        
-        function loadBotLogs() {
-            // Dies ist ein Platzhalter, da die Logik für ZOMBIE-BOT-SPEZIFISCHES LOGGING im Backend fehlt.
-            // Wir nutzen temporär das Audit Log und filtern nach "Zombie-Bot" oder Admin Aktionen.
-            fetch('/api/admin/audit_log')
-                .then(r => r.json())
-                .then(data => {
-                    const logContainer = document.getElementById('auditLog');
-                    logContainer.innerHTML = '';
-                    
-                    data.logs.reverse().forEach(entry => {
-                        // Zeige nur Zombie-Bot spezifische Aktionen und Admin-Aktionen
-                        if (entry.action.includes("Zombie-Bot") || entry.action.includes("SSH") || entry.username === 'admin') {
-                            const div = document.createElement('div');
-                            div.className = 'audit-entry';
-                            div.innerHTML = `[${entry.timestamp}] ${entry.action} (${entry.username})`;
-                            logContainer.appendChild(div);
-                        }
-                    });
-                    // Scrolle zum Ende, wenn nicht zu viel Inhalt
-                    if (logContainer.scrollHeight <= logContainer.clientHeight + 50) {
-                        logContainer.scrollTop = logContainer.scrollHeight;
-                    }
-                });
         }
 
         function loadSettings() {
@@ -289,8 +260,6 @@
                     document.getElementById('sshCommand').value = data.ssh_command || '';
                     document.getElementById('sshPassword').value = data.ssh_password || '';
                     
-                    document.getElementById('lastUpdated').textContent = data.last_updated ? new Date(data.last_updated).toLocaleString('de-DE') : 'Nie';
-                    
                     toggleUnlimited();
                 });
         }
@@ -302,8 +271,12 @@
             const stamina50 = parseInt(document.getElementById('stamina_50').value);
             const stamina10 = parseInt(document.getElementById('stamina_10').value);
 
-            if (!isUnlimited && stamina50 < 0 || stamina10 < 0) {
-                 showAlert('Limits dürfen nicht negativ sein!', 'error');
+            if (document.getElementById('sshCommand').value.trim() === '') {
+                showAlert('SSH Command fehlt!', 'error');
+                return;
+            }
+            if (!isUnlimited && (isNaN(stamina50) || stamina50 < 0 || isNaN(stamina10) || stamina10 < 0)) {
+                 showAlert('Limits müssen gültige positive Zahlen sein!', 'error');
                  return;
             }
             
@@ -392,9 +365,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             loadStatus();
-            loadBotLogs();
+            // Die Log-Ausgabe wird jetzt über den Status-Poll (updateStatus) aktualisiert
             setInterval(loadStatus, 3000); 
-            setInterval(loadBotLogs, 5000); 
         });
     </script>
 </body>
